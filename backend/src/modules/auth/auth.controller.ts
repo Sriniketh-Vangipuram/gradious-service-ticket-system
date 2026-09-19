@@ -1,4 +1,4 @@
-import type { Request, Response } from "express";
+import type { Request, Response, NextFunction } from "express";
 
 import { loginSchema, registerSchema} from "./auth.schemas";
 import { AuthError, register, login , logout, getCurrentUser} from "./auth.service";
@@ -9,6 +9,7 @@ import {
   refreshCookieOptions
 } from "./auth.cookies";
 
+import { getValidatedData } from "../../common/validation/validate-request";
 
 import { refreshSession } from "./auth.service";
 
@@ -17,6 +18,7 @@ import {
   clearRefreshCookieOptions
 } from "./auth.cookies";
 
+import { AppError } from "../../common/errors/app-error";
 
 export async function registerController(
     req:Request,
@@ -67,68 +69,60 @@ export async function registerController(
 }
 
 export async function loginController(
-    req:Request,
-    res:Response,
-):Promise<void>{
-    const parsed=loginSchema.safeParse(req.body);
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const body  = getValidatedData(
+      req,
+      { body: loginSchema },
+      "body",
+    );
 
-    if(!parsed.success){
-        res.status(400).json({
-            error:{
-                code:"VALIDATION_ERROR",
-                message:"Invalid login request",
-                details:parsed.error.flatten().fieldErrors
-            }
-        });
+    const result = await login(body, {
+      userAgent: req.get("user-agent"),
+      ipAddress: req.ip,
+    });
 
-        return;
-    }
+    res.cookie(
+      ACCESS_COOKIE_NAME,
+      result.accessToken,
+      accessCookieOptions,
+    );
 
-    try{
-        const result=await login(parsed.data,{
-            userAgent:req.get("user-agent"),
-            ipAddress:req.ip
-        });
+    res.cookie(
+      REFRESH_COOKIE_NAME,
+      result.refreshToken,
+      refreshCookieOptions,
+    );
 
-        res.cookie(
-            ACCESS_COOKIE_NAME,
-            result.accessToken,
-            accessCookieOptions
-        )
-
-        res.cookie(
-            REFRESH_COOKIE_NAME,
-            result.refreshToken,
-            refreshCookieOptions
+    res.status(200).json({
+      user: result.user,
+    });
+    } catch (error) {
+    if (error instanceof AuthError) {
+        if (error.statusCode === 401) {
+        return next(
+            new AppError(
+            "UNAUTHENTICATED",
+            "Invalid email or password.",
+            ),
         );
-
-        res.status(200).json({
-            user:result.user
-        });
-    }
-
-    catch(error){
-        if(error instanceof AuthError){
-            res.status(error.statusCode).json({
-                error:{
-                    code:
-                        error.statusCode===401
-                        ? "INVALID_CREDENTIALS"
-                        : "ACCOUNT_INACTIVE",
-                    message:error.message
-                }
-            });
-
-            return;
         }
 
-        res.status(500).json({
-            error:{
-                code:"INTERNAL_SERVER_ERROR",
-                message:"An unexpected error occured"
-            }
-        })
+        if (error.statusCode === 403) {
+        return next(
+            new AppError(
+            "FORBIDDEN",
+            "Account is inactive.",
+            ),
+        );
+        }
     }
+
+    return next(error);
+  }
 }
 
 

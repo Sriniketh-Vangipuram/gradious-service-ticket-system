@@ -8,12 +8,19 @@ import {registerController,
 
 import { requireAuth } from "../../middleware/auth.middleware";
 import { requireRole } from "../../middleware/role.middleware";
+import { validateRequest } from "../../common/validation/validate-request";
+import { loginSchema } from "./auth.schemas";
 
 export const authRouter = Router();
 
 
 authRouter.post("/register", registerController);
-authRouter.post("/login", loginController);
+authRouter.post(
+  "/login",
+  validateRequest({ body: loginSchema }),
+  loginController,
+);
+
 authRouter.post("/refresh", refreshController);
 authRouter.post("/logout", logoutController);
 authRouter.get("/me", requireAuth, meController);
