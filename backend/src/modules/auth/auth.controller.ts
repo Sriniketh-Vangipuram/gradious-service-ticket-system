@@ -22,7 +22,7 @@ import {
 
 import { getValidatedData } from "../../common/validation/validate-request";
 import { AppError } from "../../common/errors/app-error";
-
+import { sendSuccess } from "../../common/http/api-response";
 
 export async function registerController(
     req:Request,
@@ -40,12 +40,7 @@ export async function registerController(
 
         const result = await register(body);
 
-        res.status(201).json({
-            success: true,
-            data: {
-                user: result.user,
-            },
-        });
+        sendSuccess(res, { user: result.user }, 201);
     }
 
     catch (error) {
@@ -91,12 +86,7 @@ export async function loginController(
       refreshCookieOptions,
     );
 
-    res.status(200).json({
-      success:true,
-      data:{
-        user: result.user,
-      }
-    });
+    sendSuccess(res, { user: result.user });
 
     } catch (error) {
     if (error instanceof AuthError) {
@@ -161,12 +151,7 @@ export async function refreshController(
       refreshCookieOptions,
     );
 
-    res.status(200).json({
-        success: true,
-        data: {
-            user: result.user,
-        },
-    });
+    sendSuccess(res, { user: result.user });
 
   } catch (error) {
     res.clearCookie(ACCESS_COOKIE_NAME, clearAccessCookiesOptions);
@@ -212,12 +197,7 @@ export async function logoutController(
         res.clearCookie(ACCESS_COOKIE_NAME,clearAccessCookiesOptions);
         res.clearCookie(REFRESH_COOKIE_NAME,clearRefreshCookieOptions);
 
-        res.status(200).json({
-            success: true,
-            data: {
-                message: "Logged out successfully",
-            },
-        });
+        sendSuccess(res, { message: "Logged out successfully" });
     }
 
     catch(error) {
@@ -245,12 +225,7 @@ export async function meController(
   try {
     const user = await getCurrentUser(authUser.userId);
 
-    res.status(200).json({
-        success: true,
-        data: {
-            user,
-        },
-    });
+    sendSuccess(res, { user });
 
   } catch (error) {
     if (error instanceof AuthError) {
