@@ -10,6 +10,8 @@ type RequestSchemas = {
   query?: z.ZodType;
 };
 
+type RequestSection = "body" | "params" | "query";
+
 type ValidatedData<T extends RequestSchemas> = {
   [K in keyof T]: T[K] extends z.ZodType
     ? z.output<T[K]>
@@ -20,7 +22,7 @@ export const validateRequest = <T extends RequestSchemas>(
   schemas: T,
 ): RequestHandler => {
   return (req, _res, next) => {
-    const validated: Record<string, unknown> = {};
+    const validated: Partial<ValidatedData<T>> = {};
 
     const sections = ["body", "params", "query"] as const;
 
@@ -46,17 +48,15 @@ export const validateRequest = <T extends RequestSchemas>(
         );
       }
 
-      validated[section] = result.data;
+      (
+        validated as Record<RequestSection, unknown>
+      )[section] = result.data;
     }
 
     req.validated = validated;
     return next();
   };
 };
-
-
-
-type RequestSection = "body" | "params" | "query";
 
 export const getValidatedData = <
   T extends RequestSchemas,
