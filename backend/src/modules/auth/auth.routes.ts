@@ -9,12 +9,17 @@ import {registerController,
 import { requireAuth } from "../../middleware/auth.middleware";
 import { requireRole } from "../../middleware/role.middleware";
 import { validateRequest } from "../../common/validation/validate-request";
-import { loginSchema } from "./auth.schemas";
+import { loginSchema, registerSchema } from "./auth.schemas";
 
 export const authRouter = Router();
 
 
-authRouter.post("/register", registerController);
+authRouter.post(
+  "/register",
+  validateRequest({ body: registerSchema }),
+  registerController,
+);
+
 authRouter.post(
   "/login",
   validateRequest({ body: loginSchema }),

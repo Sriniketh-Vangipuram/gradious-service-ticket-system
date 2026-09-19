@@ -25,22 +25,14 @@ export async function registerController(
     res:Response
 ):Promise<void>{
 
-    const parsed = registerSchema.safeParse(req.body);
-
-    if(!parsed.success){
-        res.status(400).json({
-            error:{
-                code:"VALIDATION_ERROR",
-                message:"Invalid registration request",
-                details:parsed.error.flatten().fieldErrors
-            }
-        });
-
-        return;
-    }
+    const body = getValidatedData(
+        req,
+        {body:registerSchema},
+        "body",
+    );
 
     try{
-        const result = await register(parsed.data);
+        const result = await register(body);
 
         res.status(201).json({
             user:result.user
