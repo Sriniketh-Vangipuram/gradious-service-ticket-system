@@ -1,28 +1,33 @@
 import type { Request, Response, NextFunction } from "express";
 
-import { loginSchema, registerSchema} from "./auth.schemas";
-import { AuthError, register, login , logout, getCurrentUser} from "./auth.service";
+import { loginSchema, registerSchema } from "./auth.schemas";
+
+import {
+  AuthError,
+  register,
+  login,
+  logout,
+  getCurrentUser,
+  refreshSession,
+} from "./auth.service";
+
 import {
   ACCESS_COOKIE_NAME,
   REFRESH_COOKIE_NAME,
   accessCookieOptions,
-  refreshCookieOptions
+  refreshCookieOptions,
+  clearAccessCookiesOptions,
+  clearRefreshCookieOptions,
 } from "./auth.cookies";
 
 import { getValidatedData } from "../../common/validation/validate-request";
-
-import { refreshSession } from "./auth.service";
-
-import {
-  clearAccessCookiesOptions,
-  clearRefreshCookieOptions
-} from "./auth.cookies";
-
 import { AppError } from "../../common/errors/app-error";
+
 
 export async function registerController(
     req:Request,
-    res:Response
+    res:Response,
+    next:NextFunction
 ):Promise<void>{
 
     const body = getValidatedData(
@@ -39,25 +44,18 @@ export async function registerController(
         });
     }
 
-    catch(error){
-        if(error instanceof AuthError){
-            res.status(error.statusCode).json({
-                error:{
-                    code:"REGISTRATION_FAILED",
-                    message:error.message
-                }
-            });
-
-            return;
+    catch (error) {
+        if (error instanceof AuthError) {
+            return next(
+            new AppError(
+                "CONFLICT",
+                error.message,
+            ),
+            );
         }
 
-        res.status(500).json({
-            error:{
-                code:"INTERNAL_SERVER_ERROR",
-                message:"An unexpected error occured"
-            }
-        });
-    }
+        return next(error);
+        }
 }
 
 export async function loginController(
@@ -209,7 +207,7 @@ export async function logoutController(
     }
 
     catch(error) {
-        ;next(error);
+        next(error);
     }
 }
 
