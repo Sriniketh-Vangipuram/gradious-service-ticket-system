@@ -41,7 +41,10 @@ export async function registerController(
         const result = await register(body);
 
         res.status(201).json({
-            user:result.user
+            success: true,
+            data: {
+                user: result.user,
+            },
         });
     }
 
@@ -89,8 +92,12 @@ export async function loginController(
     );
 
     res.status(200).json({
-      user: result.user,
+      success:true,
+      data:{
+        user: result.user,
+      }
     });
+
     } catch (error) {
     if (error instanceof AuthError) {
         if (error.statusCode === 401) {
@@ -155,8 +162,12 @@ export async function refreshController(
     );
 
     res.status(200).json({
-      user: result.user,
+        success: true,
+        data: {
+            user: result.user,
+        },
     });
+
   } catch (error) {
     res.clearCookie(ACCESS_COOKIE_NAME, clearAccessCookiesOptions);
     res.clearCookie(REFRESH_COOKIE_NAME, clearRefreshCookieOptions);
@@ -202,7 +213,10 @@ export async function logoutController(
         res.clearCookie(REFRESH_COOKIE_NAME,clearRefreshCookieOptions);
 
         res.status(200).json({
-            message:"Logged out successfully"
+            success: true,
+            data: {
+                message: "Logged out successfully",
+            },
         });
     }
 
@@ -231,7 +245,13 @@ export async function meController(
   try {
     const user = await getCurrentUser(authUser.userId);
 
-    res.status(200).json({ user });
+    res.status(200).json({
+        success: true,
+        data: {
+            user,
+        },
+    });
+
   } catch (error) {
     if (error instanceof AuthError) {
       return next(
