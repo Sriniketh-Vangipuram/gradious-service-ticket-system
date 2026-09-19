@@ -30,13 +30,14 @@ export async function registerController(
     next:NextFunction
 ):Promise<void>{
 
+    try{
+
     const body = getValidatedData(
         req,
         {body:registerSchema},
         "body",
     );
 
-    try{
         const result = await register(body);
 
         res.status(201).json({
@@ -117,72 +118,71 @@ export async function loginController(
 
 
 export async function refreshController(
-    req:Request,
-    res:Response
-):Promise<void>{
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
 
-    const refreshToken=req.cookies?.[REFRESH_COOKIE_NAME];
+  if (typeof refreshToken !== "string" || !refreshToken) {
+    res.clearCookie(ACCESS_COOKIE_NAME, clearAccessCookiesOptions);
+    res.clearCookie(REFRESH_COOKIE_NAME, clearRefreshCookieOptions);
 
-    if(typeof refreshToken!=="string" || !refreshToken){
-        res.clearCookie(ACCESS_COOKIE_NAME,clearAccessCookiesOptions);
-        res.clearCookie(REFRESH_COOKIE_NAME,clearRefreshCookieOptions);
+    return next(
+      new AppError(
+        "UNAUTHENTICATED",
+        "Refresh token is missing or invalid.",
+      ),
+    );
+  }
 
-        res.status(401).json({
-            error:{
-                code:"REFRESH_TOKEN_MISSING",
-                message:"Refresh token is missing"
-            }
-        });
+  try {
+    const result = await refreshSession(refreshToken, {
+      userAgent: req.get("user-agent"),
+      ipAddress: req.ip,
+    });
 
-        return;
-    }
+    res.cookie(
+      ACCESS_COOKIE_NAME,
+      result.accessToken,
+      accessCookieOptions,
+    );
 
-    try{
-        const result=await refreshSession(refreshToken,{
-            userAgent:req.get("user-agent"),
-            ipAddress:req.ip
-        });
+    res.cookie(
+      REFRESH_COOKIE_NAME,
+      result.refreshToken,
+      refreshCookieOptions,
+    );
 
-        res.cookie(
-            ACCESS_COOKIE_NAME,
-            result.accessToken,
-            accessCookieOptions
+    res.status(200).json({
+      user: result.user,
+    });
+  } catch (error) {
+    res.clearCookie(ACCESS_COOKIE_NAME, clearAccessCookiesOptions);
+    res.clearCookie(REFRESH_COOKIE_NAME, clearRefreshCookieOptions);
+
+    if (error instanceof AuthError) {
+      if (error.statusCode === 401) {
+        return next(
+          new AppError(
+            "UNAUTHENTICATED",
+            "Refresh token is invalid or expired.",
+          ),
         );
+      }
 
-        res.cookie(
-            REFRESH_COOKIE_NAME,
-            result.refreshToken,
-            refreshCookieOptions
+      if (error.statusCode === 403) {
+        return next(
+          new AppError(
+            "FORBIDDEN",
+            "Account is inactive.",
+          ),
         );
-
-        res.status(200).json({
-            user:result.user
-        });
+      }
     }
 
-    catch(error){
-        res.clearCookie(ACCESS_COOKIE_NAME,clearAccessCookiesOptions);
-        res.clearCookie(REFRESH_COOKIE_NAME,clearRefreshCookieOptions);
-
-        if(error instanceof AuthError){
-            res.status(error.statusCode).json({
-                error:{
-                    code:"REFRESH_FAILED",
-                    message:error.message
-                }
-            });
-
-            return;
-        }
-
-        res.status(500).json({
-            error:{
-                code:"INTERNAL_SERVER_ERROR",
-                message:"An unexpected error occured"
-            }
-        });
-    }
-
+    return next(error);
+  }
 }
 
 export async function logoutController(
