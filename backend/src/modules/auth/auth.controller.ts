@@ -190,6 +190,7 @@ export async function refreshController(
 export async function logoutController(
     req:Request,
     res:Response,
+    next:NextFunction
 ):Promise<void>{
 
     const refreshToken=req.cookies?.[REFRESH_COOKIE_NAME];
@@ -207,13 +208,8 @@ export async function logoutController(
         });
     }
 
-    catch {
-        res.status(500).json({
-            error:{
-                code:"INTERNAL_SERVER_ERROR",
-                message:"An unexpected error occured"
-            }
-        });
+    catch(error) {
+        ;next(error);
     }
 }
 
