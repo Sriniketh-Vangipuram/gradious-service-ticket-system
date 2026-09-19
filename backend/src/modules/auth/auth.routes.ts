@@ -7,7 +7,6 @@ import {registerController,
         meController } from "./auth.controller";
 
 import { requireAuth } from "../../middleware/auth.middleware";
-import { requireRole } from "../../middleware/role.middleware";
 import { validateRequest } from "../../common/validation/validate-request";
 import { loginSchema, registerSchema } from "./auth.schemas";
 
