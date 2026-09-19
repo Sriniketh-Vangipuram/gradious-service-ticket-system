@@ -214,43 +214,36 @@ export async function logoutController(
 }
 
 export async function meController(
-    req:Request,
-    res:Response
-){
-    const authUser = req.authUser;
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const authUser = req.authUser;
 
-    if(!authUser){
-        return res.status(401).json({
-            error:{
-                code:"UNAUTHENTICATION",
-                message:"Authentication is required"
-            }
-        });
+  // Defensive check; requireAuth should already guarantee this.
+  if (!authUser) {
+    return next(
+      new AppError(
+        "UNAUTHENTICATED",
+        "Authentication is required.",
+      ),
+    );
+  }
+
+  try {
+    const user = await getCurrentUser(authUser.userId);
+
+    res.status(200).json({ user });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return next(
+        new AppError(
+          "UNAUTHENTICATED",
+          error.message,
+        ),
+      );
     }
 
-    try{
-        const user = await getCurrentUser(authUser.userId);
-
-        return res.status(200).json({
-            user
-        });
-    }
-    catch(error:unknown){
-        if(error instanceof AuthError){
-            return res.status(error.statusCode).json({
-                error:{
-                    code:"UNAUTHENTICATED",
-                    message:error.message
-                }
-            });
-        }
-
-        return res.status(500).json({
-            error:{
-                code:"INTERNAL_SERVER_ERROR",
-                message:"Failed to retrieve current user"
-            }
-        });
-    }
-    
+    return next(error);
+  }
 }
