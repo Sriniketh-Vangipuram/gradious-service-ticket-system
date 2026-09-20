@@ -1,0 +1,146 @@
+import {
+  AssignmentEvent,
+  UserRole,
+} from "../../../generated/prisma/client";
+
+import type { Prisma } from "../../../generated/prisma/client";
+
+import { prisma } from "../../../config/database";
+import { AppError } from "../../../common/errors/app-error";
+
+import type { TicketAssignmentActor } from "../policies/ticket-assignment-scope.policy";
+import { buildTicketAssignmentScope } from "../policies/ticket-assignment-scope.policy";
+import type { AssignTicketBody } from "../ticket.schemas";
+
+const ticketInclude = {
+  requester: {
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+    },
+  },
+  assignee: {
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+    },
+  },
+  center: {
+    select: {
+      id: true,
+      name: true,
+      code: true,
+    },
+  },
+  lab: {
+    select: {
+      id: true,
+      name: true,
+      code: true,
+    },
+  },
+  category: true,
+  software: true,
+} satisfies Prisma.TicketInclude;
+
+export async function assignTicketUseCase(
+  ticketId: number,
+  body: AssignTicketBody,
+  actor: TicketAssignmentActor,
+) {
+  return prisma.$transaction(async (tx) => {
+    // 1. Confirm the actor can manage this ticket's assignment.
+    const ticket = await tx.ticket.findFirst({
+      where: buildTicketAssignmentScope(ticketId, actor),
+      select: {
+        id: true,
+        centerId: true,
+        assigneeId: true,
+      },
+    });
+
+    if (!ticket) {
+      throw new AppError("NOT_FOUND", "Ticket not found.");
+    }
+
+    const newAssigneeId = body.assigneeId;
+
+    // 2. If the assignment is unchanged, do not create duplicate history.
+    if (ticket.assigneeId === newAssigneeId) {
+      return tx.ticket.findUniqueOrThrow({
+        where: { id: ticket.id },
+        include: ticketInclude,
+      });
+    }
+
+    // 3. Validate the target technician, unless unassigning.
+    if (newAssigneeId !== null) {
+      const technician = await tx.user.findFirst({
+        where: {
+          id: newAssigneeId,
+          role: UserRole.TECHNICIAN,
+          isActive: true,
+          centerAccess: {
+            some: {
+              centerId: ticket.centerId,
+            },
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!technician) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "The selected technician is not active or is not authorized for this ticket's center.",
+          [
+            {
+              field: "body.assigneeId",
+              message:
+                "Choose an active technician authorized for the ticket's center.",
+            },
+          ],
+        );
+      }
+    }
+
+    // 4. Determine the assignment-history event.
+    const event =
+      newAssigneeId === null
+        ? AssignmentEvent.UNASSIGNED
+        : ticket.assigneeId === null
+          ? AssignmentEvent.ASSIGNED
+          : AssignmentEvent.REASSIGNED;
+
+    // 5. Update the ticket and record history atomically.
+    await tx.ticket.update({
+      where: { id: ticket.id },
+      data: {
+        assignee:
+          newAssigneeId === null
+            ? { disconnect: true }
+            : { connect: { id: newAssigneeId } },
+      },
+    });
+
+    await tx.assignmentHistory.create({
+      data: {
+        ticketId: ticket.id,
+        event,
+        fromUserId: ticket.assigneeId,
+        toUserId: newAssigneeId,
+        assignedById: actor.userId,
+      },
+    });
+
+    // 6. Return the updated ticket with safe related data.
+    return tx.ticket.findUniqueOrThrow({
+      where: { id: ticket.id },
+      include: ticketInclude,
+    });
+  });
+}

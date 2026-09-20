@@ -158,7 +158,13 @@ export const updateTicketBodySchema = z
     }
   });
 
-
+export const assignTicketBodySchema = z.object({
+  assigneeId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .nullable(),
+}).strict();
 
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 export type TicketIdParams = z.infer<typeof ticketIdParamsSchema>;
@@ -170,3 +176,5 @@ export type UpdateTicketParams = z.infer<
 export type UpdateTicketBody = z.infer<
   typeof updateTicketBodySchema
 >;
+
+export type AssignTicketBody = z.infer<typeof assignTicketBodySchema>;
