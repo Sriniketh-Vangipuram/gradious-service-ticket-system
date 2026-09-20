@@ -48,4 +48,15 @@ export const createTicketSchema = z
     }
   });
 
+
+export const ticketIdParamsSchema = z.object({
+  ticketId:z.coerce
+    .number()
+    .int()
+    .positive("Ticket ID must be a positive integer."),
+}).strict();
+
+
+
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
+export type TicketIdParams = z.infer<typeof ticketIdParamsSchema>;

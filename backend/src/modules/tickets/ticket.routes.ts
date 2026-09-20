@@ -3,8 +3,15 @@ import { Router } from "express";
 import { requireAuth } from "../../middleware/auth.middleware";
 import { validateRequest } from "../../common/validation/validate-request";
 
-import { createTicketSchema } from "./ticket.schemas";
-import { createTicketController } from "./ticket.controller";
+import {
+  createTicketSchema,
+  ticketIdParamsSchema,
+} from "./ticket.schemas";
+
+import {
+  createTicketController,
+  getTicketController,
+} from "./ticket.controller";
 
 const ticketRouter = Router();
 
@@ -15,6 +22,15 @@ ticketRouter.post(
     body: createTicketSchema,
   }),
   createTicketController,
+);
+
+ticketRouter.get(
+  "/:ticketId",
+  requireAuth,
+  validateRequest({
+    params: ticketIdParamsSchema,
+  }),
+  getTicketController,
 );
 
 export default ticketRouter;
