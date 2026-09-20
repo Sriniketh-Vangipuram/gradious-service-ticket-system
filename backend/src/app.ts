@@ -8,7 +8,7 @@ import { pinoHttp } from "pino-http";
 import { authRouter } from "./modules/auth/auth.routes";
 import { healthRouter } from "./routes/health.routes";
 import { errorMiddleware } from "./common/errors/error.middleware";
-
+import ticketRouter from "./modules/tickets/ticket.routes";
 
 export const app = express();
 
@@ -32,6 +32,7 @@ app.use(pinoHttp());
 
 app.use("/api/v1/health", healthRouter);
 app.use("/api/v1/auth",authRouter);
+app.use("/api/v1/tickets", ticketRouter);
 
 
 // Must be registered after routes.

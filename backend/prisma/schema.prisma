@@ -410,3 +410,8 @@ model RefreshSession {
   @@index([familyId, revokedAt])
   @@index([expiresAt])
 }
+
+model TicketNumberCounter {
+  year     Int @id
+  sequence Int @default(0)
+}
