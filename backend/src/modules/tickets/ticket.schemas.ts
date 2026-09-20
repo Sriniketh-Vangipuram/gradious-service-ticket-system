@@ -166,6 +166,49 @@ export const assignTicketBodySchema = z.object({
     .nullable(),
 }).strict();
 
+const ordinaryTicketStatusValues = [
+  "TRIAGED",
+  "ASSIGNED",
+  "IN_PROGRESS",
+  "WAITING_FOR_USER",
+] as const;
+
+export const changeTicketStatusBodySchema = z.object({
+  status:z.enum(ordinaryTicketStatusValues),
+}).strict();
+
+export const resolveTicketBodySchema = z.object({
+  resolution:z.string().trim().min(10).max(5000),
+  reason:z.string().trim().min(1).max(500).optional(),
+})
+  .strict()
+  .superRefine((data,ctx)=>{
+    //Manager / admin resolution requires an explicit reason.
+    // This role-dependent requirement is enforced here.
+    if(data.reason!==undefined && data.reason.length===0){
+      ctx.addIssue({
+        code:"custom",
+        path:["reason"],
+        message:"Reason cannot be empty.",
+      });
+    }
+  });
+
+  export const reopenTicketBodySchema = z
+  .object({
+    reason: z.string().trim().min(1).max(500),
+  })
+  .strict();
+
+export const cancelTicketBodySchema = z
+  .object({
+    reason: z.string().trim().min(1).max(500),
+  })
+  .strict();
+
+
+
+
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 export type TicketIdParams = z.infer<typeof ticketIdParamsSchema>;
 export type ListTicketsQuery = z.infer<typeof listTicketsQuerySchema>;
@@ -178,3 +221,10 @@ export type UpdateTicketBody = z.infer<
 >;
 
 export type AssignTicketBody = z.infer<typeof assignTicketBodySchema>;
+export type ChangeTicketStatusBody = z.infer<typeof changeTicketStatusBodySchema>;
+export type ResolveTicketBody = z.infer<typeof resolveTicketBodySchema>;
+export type ReopenTicketBody = z.infer<typeof reopenTicketBodySchema>;
+
+export type CancelTicketBody = z.infer<
+  typeof cancelTicketBodySchema
+>;

@@ -12,10 +12,20 @@ import {
   updateTicketBodySchema,
 } from "./ticket.schemas";
 
+import { AppError } from "../../common/errors/app-error";
+
 import { updateTicketUseCase } from "./use-cases/update-ticket.use-case";
 
-import { assignTicketBodySchema } from "./ticket.schemas";
+import { assignTicketBodySchema,changeTicketStatusBodySchema } from "./ticket.schemas";
 import { assignTicketUseCase } from "./use-cases/assign-ticket.use-case";
+import { changeTicketStatusUseCase } from "./use-cases/lifecycle/change-ticket-status.use-case";
+import { resolveTicketBodySchema } from "./ticket.schemas";
+import { resolveTicketUseCase } from "./use-cases/lifecycle/resolve-ticket.use-case";
+import { confirmTicketClosureUseCase } from "./use-cases/lifecycle/confirm-ticket-closure.use-case";
+import { reopenTicketBodySchema } from "./ticket.schemas";
+import { reopenTicketUseCase } from "./use-cases/lifecycle/reopen-ticket.use-case";
+import { cancelTicketBodySchema } from "./ticket.schemas";
+import { cancelTicketUseCase } from "./use-cases/lifecycle/cancel-ticket.use-case";
 
 
 export async function createTicketController(
@@ -180,6 +190,194 @@ export async function assignTicketController(
     }
 
     const ticket = await assignTicketUseCase(
+      ticketId,
+      body,
+      actor,
+    );
+
+    sendSuccess(res, { ticket });
+  } catch (error) {
+    next(error);
+  }
+}
+
+
+export async function changeTicketStatusController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { ticketId } = getValidatedData(
+      req,
+      { params: ticketIdParamsSchema },
+      "params",
+    );
+
+    const body = getValidatedData(
+      req,
+      { body: changeTicketStatusBodySchema },
+      "body",
+    );
+
+    const actor = req.authUser;
+
+    if (!actor) {
+      return next(
+        new Error(
+          "Authenticated user missing after requireAuth middleware.",
+        ),
+      );
+    }
+
+    const ticket = await changeTicketStatusUseCase(
+      ticketId,
+      body.status,
+      actor,
+    );
+
+    sendSuccess(res, { ticket });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function resolveTicketController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+):Promise<void> {
+  try {
+    const { ticketId } = getValidatedData(
+      req,
+      { params: ticketIdParamsSchema },
+      "params",
+    );
+
+    const body = getValidatedData(
+      req,
+      { body: resolveTicketBodySchema },
+      "body",
+    );
+
+    if (!req.authUser) {
+      throw new AppError("UNAUTHENTICATED", "Authentication required.");
+    }
+
+    const ticket = await resolveTicketUseCase(
+      ticketId,
+      body,
+      req.authUser,
+    );
+
+    sendSuccess(res, { ticket });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function confirmTicketClosureController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { ticketId } = getValidatedData(
+      req,
+      { params: ticketIdParamsSchema },
+      "params",
+    );
+
+    const actor = req.authUser;
+
+    if (!actor) {
+      return next(
+        new Error(
+          "Authenticated user missing after requireAuth middleware.",
+        ),
+      );
+    }
+
+    const ticket = await confirmTicketClosureUseCase(
+      ticketId,
+      actor,
+    );
+
+    sendSuccess(res, { ticket });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function reopenTicketController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { ticketId } = getValidatedData(
+      req,
+      { params: ticketIdParamsSchema },
+      "params",
+    );
+
+    const body = getValidatedData(
+      req,
+      { body: reopenTicketBodySchema },
+      "body",
+    );
+
+    const actor = req.authUser;
+
+    if (!actor) {
+      return next(
+        new Error(
+          "Authenticated user missing after requireAuth middleware.",
+        ),
+      );
+    }
+
+    const ticket = await reopenTicketUseCase(
+      ticketId,
+      body,
+      actor,
+    );
+
+    sendSuccess(res, { ticket });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function cancelTicketController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { ticketId } = getValidatedData(
+      req,
+      { params: ticketIdParamsSchema },
+      "params",
+    );
+
+    const body = getValidatedData(
+      req,
+      { body: cancelTicketBodySchema },
+      "body",
+    );
+
+    const actor = req.authUser;
+
+    if (!actor) {
+      return next(
+        new Error(
+          "Authenticated user missing after requireAuth middleware.",
+        ),
+      );
+    }
+
+    const ticket = await cancelTicketUseCase(
       ticketId,
       body,
       actor,
