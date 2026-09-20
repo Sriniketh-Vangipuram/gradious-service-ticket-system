@@ -114,8 +114,59 @@ export const listTicketsQuerySchema = z.object({
 
 }).strict();
 
+export const updateTicketParamsSchema = z.object({
+  ticketId:z.coerce.number().int().positive(),
+}).strict();
+
+export const updateTicketBodySchema = z
+  .object({
+    title: z.string().trim().min(5).max(150).optional(),
+
+    description: z.string().trim().min(10).max(5000).optional(),
+
+    categoryId: z.coerce.number().int().positive().optional(),
+
+    softwareId: z.coerce.number().int().positive().nullable().optional(),
+
+    requestType: z.enum(Object.values(SoftwareRequestType)).nullable().optional(),
+
+    centerId: z.coerce.number().int().positive().optional(),
+
+    labId: z.coerce.number().int().positive().optional(),
+
+    priority: z.enum(Object.values(TicketPriority)).optional(),
+  })
+    .strict()
+    .superRefine((body, ctx) => {
+    if (Object.keys(body).length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        message: "At least one field must be provided for update.",
+      });
+    }
+
+    const hasSoftwareId = body.softwareId !== undefined;
+    const hasRequestType = body.requestType !== undefined;
+
+    if (hasSoftwareId !== hasRequestType) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["softwareId"],
+        message:
+          "softwareId and requestType must be provided together.",
+      });
+    }
+  });
+
 
 
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 export type TicketIdParams = z.infer<typeof ticketIdParamsSchema>;
 export type ListTicketsQuery = z.infer<typeof listTicketsQuerySchema>;
+export type UpdateTicketParams = z.infer<
+  typeof updateTicketParamsSchema
+>;
+
+export type UpdateTicketBody = z.infer<
+  typeof updateTicketBodySchema
+>;

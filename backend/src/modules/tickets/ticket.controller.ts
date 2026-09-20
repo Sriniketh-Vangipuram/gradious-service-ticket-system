@@ -7,7 +7,12 @@ import { createTicketUseCase } from "./use-cases/create-ticket.use-case";
 import { getTicketUseCase } from "./use-cases/get-ticket.use-case";
 import { listTicketsQuerySchema } from "./ticket.schemas";
 import { listTicketsUseCase } from "./use-cases/list-tickets.use-case";
+import {
+  updateTicketParamsSchema,
+  updateTicketBodySchema,
+} from "./ticket.schemas";
 
+import { updateTicketUseCase } from "./use-cases/update-ticket.use-case";
 
 export async function createTicketController(
     req:Request,
@@ -95,6 +100,46 @@ export async function listTicketsController(
     const result = await listTicketsUseCase(query, actor);
 
     sendSuccess(res, result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateTicketController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { ticketId } = getValidatedData(
+      req,
+      { params: updateTicketParamsSchema },
+      "params",
+    );
+
+    const body = getValidatedData(
+      req,
+      { body: updateTicketBodySchema },
+      "body",
+    );
+
+    const actor = req.authUser;
+
+    if (!actor) {
+      return next(
+        new Error(
+          "Authenticated user missing after requireAuth middleware.",
+        ),
+      );
+    }
+
+    const ticket = await updateTicketUseCase(
+      ticketId,
+      body,
+      actor,
+    );
+
+    sendSuccess(res, { ticket });
   } catch (error) {
     next(error);
   }

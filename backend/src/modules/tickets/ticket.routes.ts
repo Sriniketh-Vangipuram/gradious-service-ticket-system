@@ -7,6 +7,8 @@ import {
   createTicketSchema,
   ticketIdParamsSchema,
   listTicketsQuerySchema,
+  updateTicketBodySchema,
+  updateTicketParamsSchema,
 
 } from "./ticket.schemas";
 
@@ -14,6 +16,7 @@ import {
   createTicketController,
   getTicketController,
   listTicketsController,
+  updateTicketController,
 } from "./ticket.controller";
 
 const ticketRouter = Router();
@@ -43,6 +46,16 @@ ticketRouter.get(
     params: ticketIdParamsSchema,
   }),
   getTicketController,
+);
+
+ticketRouter.patch(
+  "/:ticketId",
+  requireAuth,
+  validateRequest({
+    params: updateTicketParamsSchema,
+    body: updateTicketBodySchema,
+  }),
+  updateTicketController,
 );
 
 export default ticketRouter;
