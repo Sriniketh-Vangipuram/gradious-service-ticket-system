@@ -6,11 +6,14 @@ import { validateRequest } from "../../common/validation/validate-request";
 import {
   createTicketSchema,
   ticketIdParamsSchema,
+  listTicketsQuerySchema,
+
 } from "./ticket.schemas";
 
 import {
   createTicketController,
   getTicketController,
+  listTicketsController,
 } from "./ticket.controller";
 
 const ticketRouter = Router();
@@ -22,6 +25,15 @@ ticketRouter.post(
     body: createTicketSchema,
   }),
   createTicketController,
+);
+
+ticketRouter.get(
+  "/",
+  requireAuth,
+  validateRequest({
+    query: listTicketsQuerySchema,
+  }),
+  listTicketsController,
 );
 
 ticketRouter.get(

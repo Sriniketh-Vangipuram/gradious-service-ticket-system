@@ -5,6 +5,9 @@ import { sendSuccess } from "../../common/http/api-response";
 import { createTicketSchema,ticketIdParamsSchema } from "./ticket.schemas";
 import { createTicketUseCase } from "./use-cases/create-ticket.use-case";
 import { getTicketUseCase } from "./use-cases/get-ticket.use-case";
+import { listTicketsQuerySchema } from "./ticket.schemas";
+import { listTicketsUseCase } from "./use-cases/list-tickets.use-case";
+
 
 export async function createTicketController(
     req:Request,
@@ -62,6 +65,36 @@ export async function getTicketController(
     const ticket = await getTicketUseCase(ticketId, actor);
 
     sendSuccess(res, { ticket });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function listTicketsController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const query = getValidatedData(
+      req,
+      { query: listTicketsQuerySchema },
+      "query",
+    );
+
+    const actor = req.authUser;
+
+    if (!actor) {
+      return next(
+        new Error(
+          "Authenticated user missing after requireAuth middleware.",
+        ),
+      );
+    }
+
+    const result = await listTicketsUseCase(query, actor);
+
+    sendSuccess(res, result);
   } catch (error) {
     next(error);
   }
