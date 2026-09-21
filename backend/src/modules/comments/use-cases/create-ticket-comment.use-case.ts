@@ -10,7 +10,10 @@ import { AppError } from "../../../common/errors/app-error";
 import type { AuthenticatedUser } from "../../../middleware/auth.middleware";
 import type { CreateTicketCommentBody } from "../comment.schemas";
 import type { Prisma } from "../../../generated/prisma/client";
-
+import {
+  addBusinessMinutes,
+  getBusinessMinutesBetween,
+} from "../../sla/business-calendar.service";
 
 
 const commentInclude = {
@@ -76,6 +79,7 @@ export async function createTicketComment(
         status: true,
         requesterId: true,
         assigneeId: true,
+        centerId:true,
       },
     });
 
@@ -106,45 +110,140 @@ export async function createTicketComment(
       include: commentInclude,
     });
 
-    // 4. A public requester reply resumes a ticket awaiting the user.
-    const isPublicRequesterReply =
-      actor.userId === ticket.requesterId &&
-      actor.role === UserRole.EMPLOYEE &&
+    // 4. Record the first qualifying public staff response.
+    // Only set it once; later comments must not overwrite it.
+    const isPublicStaffResponse =
+      actor.role !== UserRole.EMPLOYEE &&
       body.visibility === CommentVisibility.PUBLIC;
 
-    if (
-      isPublicRequesterReply &&
-      ticket.status === TicketStatus.WAITING_FOR_USER
-    ) {
-      const updateResult = await tx.ticket.updateMany({
+    if (isPublicStaffResponse) {
+      await tx.ticket.updateMany({
         where: {
           id: ticket.id,
-          requesterId: actor.userId,
-          status: TicketStatus.WAITING_FOR_USER,
+          firstResponseAt: null,
         },
         data: {
-          status: TicketStatus.IN_PROGRESS,
-        },
-      });
-
-      if (updateResult.count !== 1) {
-        throw new AppError(
-          "CONFLICT",
-          "Ticket status changed before the reply could resume it. Please refresh and try again.",
-        );
-      }
-
-      await tx.ticketHistory.create({
-        data: {
-          ticketId: ticket.id,
-          event: TicketHistoryEvent.STATUS_CHANGED,
-          fromValue: TicketStatus.WAITING_FOR_USER,
-          toValue: TicketStatus.IN_PROGRESS,
-          actorId: actor.userId,
-          description: "Ticket resumed after a public requester reply.",
+          firstResponseAt: comment.createdAt,
         },
       });
     }
+
+    // 5. A qualifying public requester reply resumes the ticket and SLA.
+      const isPublicRequesterReply =
+        actor.userId === ticket.requesterId &&
+        actor.role === UserRole.EMPLOYEE &&
+        body.visibility === CommentVisibility.PUBLIC;
+
+      if (
+        isPublicRequesterReply &&
+        ticket.status === TicketStatus.WAITING_FOR_USER
+      ) {
+        const activeCycle = await tx.ticketSlaCycle.findFirst({
+          where: {
+            ticketId: ticket.id,
+            resolvedAt: null,
+          },
+          orderBy: {
+            cycleNumber: "desc",
+          },
+          select: {
+            id: true,
+            dueAt: true,
+            pausedAt: true,
+            totalPausedMinutes: true,
+          },
+        });
+
+        if (!activeCycle || activeCycle.pausedAt === null) {
+          throw new AppError(
+            "CONFLICT",
+            "The active SLA cycle is missing or is not paused.",
+          );
+        }
+
+        const ticketUpdateResult = await tx.ticket.updateMany({
+          where: {
+            id: ticket.id,
+            requesterId: actor.userId,
+            status: TicketStatus.WAITING_FOR_USER,
+          },
+          data: {
+            status: TicketStatus.IN_PROGRESS,
+          },
+        });
+
+        if (ticketUpdateResult.count !== 1) {
+          throw new AppError(
+            "CONFLICT",
+            "Ticket status changed before the reply could resume it. Please refresh and try again.",
+          );
+        }
+
+
+
+        // Use the persisted comment timestamp as the resume instant.
+        const resumedAt = comment.createdAt;
+
+        const pausedBusinessMinutes = await getBusinessMinutesBetween({
+          startAt: activeCycle.pausedAt,
+          endAt: resumedAt,
+          centerId: ticket.centerId,
+          db: tx,
+        });
+
+        const pausedMinutesToPersist = Math.round(pausedBusinessMinutes);
+
+        // Extend the existing deadline by the business time spent paused.
+        const resumedDueAt = await addBusinessMinutes({
+          startAt: activeCycle.dueAt,
+          businessMinutes: pausedMinutesToPersist,
+          centerId: ticket.centerId,
+          db: tx,
+        });
+
+        const cycleUpdateResult = await tx.ticketSlaCycle.updateMany({
+          where: {
+            id: activeCycle.id,
+            resolvedAt: null,
+            pausedAt: activeCycle.pausedAt,
+          },
+          data: {
+            dueAt: resumedDueAt,
+            pausedAt: null,
+            totalPausedMinutes: {
+              increment: pausedMinutesToPersist,
+            },
+          },
+        });
+
+        if (cycleUpdateResult.count !== 1) {
+          throw new AppError(
+            "CONFLICT",
+            "The SLA cycle changed before it could be resumed. Refresh and try again.",
+          );
+        }
+
+        await tx.ticket.update({
+          where: {
+            id: ticket.id,
+          },
+          data: {
+            resolutionDueAt: resumedDueAt,
+          },
+        });
+
+        await tx.ticketHistory.create({
+          data: {
+            ticketId: ticket.id,
+            event: TicketHistoryEvent.STATUS_CHANGED,
+            fromValue: TicketStatus.WAITING_FOR_USER,
+            toValue: TicketStatus.IN_PROGRESS,
+            actorId: actor.userId,
+            description:
+              "Ticket resumed after a public requester reply.",
+          },
+        });
+      }
 
     return comment;
   });

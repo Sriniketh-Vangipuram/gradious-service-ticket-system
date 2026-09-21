@@ -121,23 +121,45 @@ async function main() {
 
   // 5. Development SLA defaults (minutes)
   const slaPolicies = [
-    { priority: "CRITICAL" as const, firstResponseMinutes: 15, resolutionMinutes: 120 },
-    { priority: "HIGH" as const, firstResponseMinutes: 30, resolutionMinutes: 240 },
-    { priority: "MEDIUM" as const, firstResponseMinutes: 120, resolutionMinutes: 1440 },
-    { priority: "LOW" as const, firstResponseMinutes: 240, resolutionMinutes: 4320 }
-  ];
-
-  for (const policy of slaPolicies) {
-    await prisma.slaPolicy.upsert({
-      where: { priority: policy.priority },
-      update: {
-        firstResponseMinutes: policy.firstResponseMinutes,
-        resolutionMinutes: policy.resolutionMinutes,
-        isActive: true
-      },
-      create: policy
-    });
+  {
+    priority: "CRITICAL" as const,
+    firstResponseMinutes: 15,
+    resolutionMinutes: 240,
+    atRiskThresholdPercent: 75
+  },
+  {
+    priority: "HIGH" as const,
+    firstResponseMinutes: 60,
+    resolutionMinutes: 480,
+    atRiskThresholdPercent: 75
+  },
+  {
+    priority: "MEDIUM" as const,
+    firstResponseMinutes: 240,
+    resolutionMinutes: 1080,
+    atRiskThresholdPercent: 75
+  },
+  {
+    priority: "LOW" as const,
+    firstResponseMinutes: 540,
+    resolutionMinutes: 2700,
+    atRiskThresholdPercent: 75
   }
+];
+
+  
+  for (const policy of slaPolicies) {
+  await prisma.slaPolicy.upsert({
+    where: { priority: policy.priority },
+    update: {
+      firstResponseMinutes: policy.firstResponseMinutes,
+      resolutionMinutes: policy.resolutionMinutes,
+      atRiskThresholdPercent: policy.atRiskThresholdPercent,
+      isActive: true
+    },
+    create: policy
+  });
+}
 
   console.log("Reference data seeded successfully.");
 

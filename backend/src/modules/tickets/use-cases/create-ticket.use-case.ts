@@ -5,6 +5,9 @@ import { AppError } from "../../../common/errors/app-error";
 
 import type { CreateTicketInput } from "../ticket.schemas";
 import { reserveTicketNumber } from "../ticket-number.service";
+import { addBusinessMinutes } from "../../sla/business-calendar.service";
+import { getActiveSlaPolicy } from "../../sla/sla-policy.service";
+
 
 type AuthenticatedActor = {
     userId: number;
@@ -214,13 +217,34 @@ export async function createTicketUseCase(
                 }
             }
 
+            // 10. Load the active SLA policy for the ticket priority.
+            const slaPolicy = await getActiveSlaPolicy(input.priority, tx);
 
-            // 10. Reserver a yearly sequential ticket number.
+            // Use one consistent start timestamp for the SLA deadlines and cycle.
+            const slaStartedAt = new Date();
+
+            // Calculate deadlines using business minutes and the center's calendar.
+            const firstResponseDueAt = await addBusinessMinutes({
+            startAt: slaStartedAt,
+            businessMinutes: slaPolicy.firstResponseMinutes,
+            centerId: input.centerId,
+            db: tx
+            });
+
+            const resolutionDueAt = await addBusinessMinutes({
+            startAt: slaStartedAt,
+            businessMinutes: slaPolicy.resolutionMinutes,
+            centerId: input.centerId,
+            db: tx
+            });
+
+
+            // 11. Reserver a yearly sequential ticket number.
             const year = new Date().getFullYear();
             const ticketNumber = await reserveTicketNumber(tx, year);
 
 
-            // 11. Create the ticket and its intial history atomically.
+            // 12. Create the ticket and its intial history atomically.
             const ticket = await tx.ticket.create({
                 data:{
                     ticketNumber,
@@ -234,7 +258,18 @@ export async function createTicketUseCase(
                     labId:input.labId,
                     categoryId: input.categoryId,
                     status:"OPEN",
-
+                    firstResponseDueAt,
+                    resolutionDueAt,
+                    firstResponseTargetMinutes: slaPolicy.firstResponseMinutes,
+                    resolutionTargetMinutes: slaPolicy.resolutionMinutes,
+                    slaCycles: {
+                        create: {
+                            cycleNumber: 1,
+                            startedAt: slaStartedAt,
+                            dueAt: resolutionDueAt,
+                            targetMinutes: slaPolicy.resolutionMinutes
+                        }
+                    },
 
                     history:{
                         create:{

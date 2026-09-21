@@ -14,7 +14,6 @@ datasource db {
 
 // lets create user tables
 
-
 enum UserRole {
   EMPLOYEE
   TECHNICIAN
@@ -30,46 +29,63 @@ model User {
   role         UserRole
   isActive     Boolean  @default(true)
 
-  requestedTickets        Ticket[]            @relation("TicketRequester")
-  assignedTickets         Ticket[]            @relation("TicketAssignee")
-  commentsAuthored        Comment[]           @relation("CommentAuthor")
-  ticketHistoryActions    TicketHistory[]     @relation("TicketHistoryActor")
-  assignmentFrom AssignmentHistory[] @relation("AssignmentFrom")
-  assignmentTo   AssignmentHistory[] @relation("AssignmentTo")  
-  assignmentActions       AssignmentHistory[] @relation("AssignmentActor")
-  notifications           Notification[]
-  auditLogs               AuditLog[]          @relation("AuditLogActor")
-  refreshSessions         RefreshSession[]
+  requestedTickets     Ticket[]            @relation("TicketRequester")
+  assignedTickets      Ticket[]            @relation("TicketAssignee")
+  commentsAuthored     Comment[]           @relation("CommentAuthor")
+  ticketHistoryActions TicketHistory[]     @relation("TicketHistoryActor")
+  assignmentFrom       AssignmentHistory[] @relation("AssignmentFrom")
+  assignmentTo         AssignmentHistory[] @relation("AssignmentTo")
+  assignmentActions    AssignmentHistory[] @relation("AssignmentActor")
+  notifications        Notification[]
+  auditLogs            AuditLog[]          @relation("AuditLogActor")
+  refreshSessions      RefreshSession[]
   // Optional primary/home center
-  centerId     Int?
-  center       Center?  @relation("UserPrimaryCenter", fields: [centerId], references: [id], onDelete: SetNull)
+  centerId             Int?
+  center               Center?             @relation("UserPrimaryCenter", fields: [centerId], references: [id], onDelete: SetNull)
 
   // Centers this user is authorized to access
   centerAccess UserCenter[]
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([role, isActive])
   @@index([centerId])
 }
 
 model Center {
-  id        Int      @id @default(autoincrement())
-  name      String   @db.VarChar(120)
-  code      String   @unique @db.VarChar(30)
-  isActive  Boolean  @default(true)
-  labs      Lab[]
-  tickets   Ticket[]
+  id       Int       @id @default(autoincrement())
+  name     String    @db.VarChar(120)
+  code     String    @unique @db.VarChar(30)
+  isActive Boolean   @default(true)
+  labs     Lab[]
+  tickets  Ticket[]
+  holidays Holiday[]
 
   // Users whose primary/home center is this center
   primaryUsers User[] @relation("UserPrimaryCenter")
 
   // Users authorized to access this center
-  userAccess   UserCenter[]
+  userAccess UserCenter[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Holiday {
+  id   Int      @id @default(autoincrement())
+  date DateTime @db.Date
+  name String   @db.VarChar(120)
+
+  // null = applies to all centers
+  centerId Int?
+  center   Center? @relation(fields: [centerId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@index([centerId, date])
 }
 
 model UserCenter {
@@ -77,27 +93,25 @@ model UserCenter {
   centerId  Int
   createdAt DateTime @default(now())
 
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  center    Center @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  center Center @relation(fields: [centerId], references: [id], onDelete: Cascade)
 
   // A user cannot be linked to the same center twice
   @@id([userId, centerId])
-
   // Efficiently find users authorized for a center
   @@index([centerId, userId])
 }
 
-
 model Lab {
-  id        Int      @id @default(autoincrement())
-  name      String   @db.VarChar(120)
-  code      String   @db.VarChar(30)
-  isActive  Boolean  @default(true)
+  id       Int     @id @default(autoincrement())
+  name     String  @db.VarChar(120)
+  code     String  @db.VarChar(30)
+  isActive Boolean @default(true)
 
   tickets Ticket[]
 
-  centerId  Int
-  center    Center   @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  centerId Int
+  center   Center @relation(fields: [centerId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -106,39 +120,37 @@ model Lab {
   @@index([centerId, isActive])
 }
 
-
 model Category {
-  id          Int      @id @default(autoincrement())
-  name        String   @db.VarChar(100)
-  code        String   @unique @db.VarChar(50)
-  description String?  @db.VarChar(500)
-  isActive    Boolean  @default(true)
+  id          Int     @id @default(autoincrement())
+  name        String  @db.VarChar(100)
+  code        String  @unique @db.VarChar(50)
+  description String? @db.VarChar(500)
+  isActive    Boolean @default(true)
 
   tickets Ticket[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([isActive, name])
 }
 
 model Software {
-  id              Int      @id @default(autoincrement())
-  name            String   @db.VarChar(150)
-  vendor          String?  @db.VarChar(120)
-  version         String?  @db.VarChar(60)
-  licenseRequired Boolean  @default(false)
-  isActive        Boolean  @default(true)
+  id              Int     @id @default(autoincrement())
+  name            String  @db.VarChar(150)
+  vendor          String? @db.VarChar(120)
+  version         String? @db.VarChar(60)
+  licenseRequired Boolean @default(false)
+  isActive        Boolean @default(true)
 
   tickets Ticket[]
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([isActive, name])
   @@index([vendor, name])
 }
-
 
 enum TicketStatus {
   OPEN
@@ -165,49 +177,51 @@ enum SoftwareRequestType {
   LICENSE
 }
 
-
 model Ticket {
-  id           Int      @id @default(autoincrement())
-  ticketNumber String   @unique @db.VarChar(30)
+  id           Int    @id @default(autoincrement())
+  ticketNumber String @unique @db.VarChar(30)
 
-  title        String   @db.VarChar(200)
-  description  String   @db.Text
+  title       String @db.VarChar(200)
+  description String @db.Text
 
-  status       TicketStatus   @default(OPEN)
-  priority     TicketPriority @default(MEDIUM)
-  requestType  SoftwareRequestType?
+  status      TicketStatus         @default(OPEN)
+  priority    TicketPriority       @default(MEDIUM)
+  requestType SoftwareRequestType?
 
-  requesterId  Int
-  requester    User     @relation("TicketRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  requesterId Int
+  requester   User @relation("TicketRequester", fields: [requesterId], references: [id], onDelete: Restrict)
 
-  assigneeId   Int?
-  assignee     User?    @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assigneeId Int?
+  assignee   User? @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
 
-  centerId     Int
-  center       Center   @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  centerId Int
+  center   Center @relation(fields: [centerId], references: [id], onDelete: Restrict)
 
-  labId        Int
-  lab          Lab      @relation(fields: [labId], references: [id], onDelete: Restrict)
+  labId Int
+  lab   Lab @relation(fields: [labId], references: [id], onDelete: Restrict)
 
-  categoryId   Int
-  category     Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
-  softwareId   Int?
-  software     Software? @relation(fields: [softwareId], references: [id], onDelete: SetNull)
+  softwareId Int?
+  software   Software? @relation(fields: [softwareId], references: [id], onDelete: SetNull)
 
-  comments           Comment[]
-  history            TicketHistory[]
-  assignmentHistory  AssignmentHistory[]
-  notifications      Notification[]
+  comments          Comment[]
+  history           TicketHistory[]
+  assignmentHistory AssignmentHistory[]
+  notifications     Notification[]
 
-  firstResponseAt     DateTime?
-  resolvedAt          DateTime?
-  closedAt            DateTime?
-  firstResponseDueAt  DateTime?
-  resolutionDueAt     DateTime?
+  firstResponseAt            DateTime?
+  resolvedAt                 DateTime?
+  closedAt                   DateTime?
+  firstResponseDueAt         DateTime?
+  resolutionDueAt            DateTime?
+  firstResponseTargetMinutes Int?
+  resolutionTargetMinutes    Int?
+  slaCycles                  TicketSlaCycle[]
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([requesterId, createdAt])
   @@index([assigneeId, status])
@@ -215,7 +229,6 @@ model Ticket {
   @@index([labId, status])
   @@index([status, priority, createdAt])
 }
-
 
 enum CommentVisibility {
   PUBLIC
@@ -242,61 +255,60 @@ enum AssignmentEvent {
   UNASSIGNED
 }
 
-
 model Comment {
-  id         Int      @id @default(autoincrement())
-  content    String   @db.Text
+  id         Int               @id @default(autoincrement())
+  content    String            @db.Text
   visibility CommentVisibility @default(PUBLIC)
 
-  ticketId   Int
-  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  ticketId Int
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
 
-  authorId   Int
-  author     User     @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  authorId Int
+  author   User @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([ticketId, createdAt])
   @@index([authorId, createdAt])
 }
 
 model TicketHistory {
-  id          Int      @id @default(autoincrement())
+  id          Int                @id @default(autoincrement())
   event       TicketHistoryEvent
-  fromValue   String?  @db.VarChar(255)
-  toValue     String?  @db.VarChar(255)
-  description String?  @db.VarChar(500)
+  fromValue   String?            @db.VarChar(255)
+  toValue     String?            @db.VarChar(255)
+  description String?            @db.VarChar(500)
 
-  ticketId    Int
-  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  ticketId Int
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
 
-  actorId     Int?
-  actor       User?    @relation("TicketHistoryActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId Int?
+  actor   User? @relation("TicketHistoryActor", fields: [actorId], references: [id], onDelete: SetNull)
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([ticketId, createdAt])
   @@index([actorId, createdAt])
 }
 
 model AssignmentHistory {
-  id        Int             @id @default(autoincrement())
-  event     AssignmentEvent
+  id    Int             @id @default(autoincrement())
+  event AssignmentEvent
 
-  ticketId  Int
-  ticket    Ticket          @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  ticketId Int
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
 
   fromUserId Int?
-  fromUser   User?          @relation("AssignmentFrom", fields: [fromUserId], references: [id], onDelete: SetNull)
+  fromUser   User? @relation("AssignmentFrom", fields: [fromUserId], references: [id], onDelete: SetNull)
 
-  toUserId   Int?
-  toUser     User?          @relation("AssignmentTo", fields: [toUserId], references: [id], onDelete: SetNull)
+  toUserId Int?
+  toUser   User? @relation("AssignmentTo", fields: [toUserId], references: [id], onDelete: SetNull)
 
   assignedById Int?
-  assignedBy   User?        @relation("AssignmentActor", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedBy   User? @relation("AssignmentActor", fields: [assignedById], references: [id], onDelete: SetNull)
 
-  createdAt DateTime        @default(now())
+  createdAt DateTime @default(now())
 
   @@index([ticketId, createdAt])
   @@index([fromUserId, createdAt])
@@ -330,19 +342,18 @@ enum AuditAction {
   AUTHENTICATION_EVENT
 }
 
-
 model Notification {
-  id        Int      @id @default(autoincrement())
-  type      NotificationType
-  title     String   @db.VarChar(150)
-  message   String   @db.VarChar(500)
-  readAt    DateTime?
+  id      Int              @id @default(autoincrement())
+  type    NotificationType
+  title   String           @db.VarChar(150)
+  message String           @db.VarChar(500)
+  readAt  DateTime?
 
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
-  ticketId  Int?
-  ticket    Ticket?  @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  ticketId Int?
+  ticket   Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 
@@ -351,33 +362,63 @@ model Notification {
 }
 
 model SlaPolicy {
-  id                     Int      @id @default(autoincrement())
+  id                     Int            @id @default(autoincrement())
   priority               TicketPriority @unique
   firstResponseMinutes   Int
   resolutionMinutes      Int
-  isActive               Boolean  @default(true)
+  isActive               Boolean        @default(true)
+  atRiskThresholdPercent Int            @default(75)
 
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([isActive])
 }
 
+enum SlaCycleOutcome {
+  MET
+  BREACHED
+}
+
+model TicketSlaCycle {
+  id          Int @id @default(autoincrement())
+  cycleNumber Int
+
+  startedAt     DateTime @default(now())
+  dueAt         DateTime
+  targetMinutes Int
+
+  resolvedAt DateTime?
+  outcome    SlaCycleOutcome?
+
+  ticketId Int
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  pausedAt           DateTime?
+  totalPausedMinutes Int       @default(0)
+
+  @@unique([ticketId, cycleNumber])
+  @@index([ticketId, startedAt])
+  @@index([dueAt, resolvedAt])
+}
+
 model AuditLog {
-  id          Int      @id @default(autoincrement())
-  action      AuditAction
-  entityType  String   @db.VarChar(100)
-  entityId    String   @db.VarChar(100)
-  oldValue    Json?
-  newValue    Json?
-  metadata    Json?
-  ipAddress   String?  @db.VarChar(45)
-  userAgent   String?  @db.VarChar(500)
+  id         Int         @id @default(autoincrement())
+  action     AuditAction
+  entityType String      @db.VarChar(100)
+  entityId   String      @db.VarChar(100)
+  oldValue   Json?
+  newValue   Json?
+  metadata   Json?
+  ipAddress  String?     @db.VarChar(45)
+  userAgent  String?     @db.VarChar(500)
 
-  actorId     Int?
-  actor       User?    @relation("AuditLogActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId Int?
+  actor   User? @relation("AuditLogActor", fields: [actorId], references: [id], onDelete: SetNull)
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([actorId, createdAt])
   @@index([entityType, entityId, createdAt])
@@ -385,16 +426,16 @@ model AuditLog {
 }
 
 model RefreshSession {
-  id        Int    @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
   // Groups rotated tokens belonging to one login session.
-  familyId  String @db.Char(36)
+  familyId String @db.Char(36)
 
   // Store only a hash of the raw refresh token.
   tokenHash String @unique @db.VarChar(255)
 
-  userId    Int
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   expiresAt DateTime
   revokedAt DateTime?

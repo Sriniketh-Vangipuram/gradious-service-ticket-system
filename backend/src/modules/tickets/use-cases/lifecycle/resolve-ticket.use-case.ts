@@ -93,6 +93,8 @@ export async function resolveTicketUseCase(
 
     assertValidTicketTransition(ticket.status, TicketStatus.RESOLVED);
 
+    const resolvedAt = new Date();
+
     // Guard against a concurrent status change or technician reassignment.
     const updateResult = await tx.ticket.updateMany({
     where: {
@@ -115,7 +117,7 @@ export async function resolveTicketUseCase(
     },
     data: {
         status: TicketStatus.RESOLVED,
-        resolvedAt: new Date(),
+        resolvedAt,
     },
     });
 
@@ -123,6 +125,49 @@ export async function resolveTicketUseCase(
       throw new AppError(
         "CONFLICT",
         "Ticket changed while the resolution was being processed. Please reload and try again.",
+      );
+    }
+
+    // Complete the active resolution SLA cycle.
+    const activeSlaCycle = await tx.ticketSlaCycle.findFirst({
+      where: {
+        ticketId: ticket.id,
+        resolvedAt: null,
+      },
+      orderBy: {
+        cycleNumber: "desc",
+      },
+      select: {
+        id: true,
+        dueAt: true,
+      },
+    });
+
+    if (!activeSlaCycle) {
+      throw new AppError(
+        "CONFLICT",
+        "No active SLA cycle exists for this ticket.",
+      );
+    }
+
+    const slaOutcome =
+      resolvedAt <= activeSlaCycle.dueAt ? "MET" : "BREACHED";
+
+    const cycleUpdateResult = await tx.ticketSlaCycle.updateMany({
+      where: {
+        id: activeSlaCycle.id,
+        resolvedAt: null,
+      },
+      data: {
+        resolvedAt,
+        outcome: slaOutcome,
+      },
+    });
+
+    if (cycleUpdateResult.count !== 1) {
+      throw new AppError(
+        "CONFLICT",
+        "The SLA cycle changed while the ticket was being resolved. Please reload and try again.",
       );
     }
 

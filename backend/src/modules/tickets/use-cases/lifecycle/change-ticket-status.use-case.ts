@@ -170,6 +170,56 @@ export async function changeTicketStatusUseCase(
       );
     }
 
+    if (nextStatus === TicketStatus.WAITING_FOR_USER) {
+      const pausedAt = new Date();
+
+      const activeCycle = await tx.ticketSlaCycle.findFirst({
+        where: {
+          ticketId: ticket.id,
+          resolvedAt: null,
+        },
+        orderBy: {
+          cycleNumber: "desc",
+        },
+        select: {
+          id: true,
+          pausedAt: true,
+        },
+      });
+
+      if (!activeCycle) {
+        throw new AppError(
+          "CONFLICT",
+          "No active SLA cycle exists for this ticket.",
+        );
+      }
+
+      if (activeCycle.pausedAt !== null) {
+        throw new AppError(
+          "CONFLICT",
+          "The active SLA cycle is already paused.",
+        );
+      }
+
+      const pauseResult = await tx.ticketSlaCycle.updateMany({
+        where: {
+          id: activeCycle.id,
+          resolvedAt: null,
+          pausedAt: null,
+        },
+        data: {
+          pausedAt,
+        },
+      });
+
+      if (pauseResult.count !== 1) {
+        throw new AppError(
+          "CONFLICT",
+          "The SLA cycle changed before it could be paused. Refresh and try again.",
+        );
+      }
+    }
+
     await tx.ticketHistory.create({
       data: {
         ticketId: ticket.id,
