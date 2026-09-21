@@ -30,6 +30,8 @@ import {
   cancelTicketController,
 } from "./ticket.controller";
 
+import commentRouter from "../comments/comment.routes";
+
 const ticketRouter = Router();
 
 ticketRouter.post(
@@ -131,5 +133,8 @@ ticketRouter.post(
   }),
   cancelTicketController,
 );
+
+
+ticketRouter.use("/:ticketId/comments", commentRouter);
 
 export default ticketRouter;
