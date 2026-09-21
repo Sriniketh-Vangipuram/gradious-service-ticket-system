@@ -13,6 +13,11 @@ import {
   getTicketLifecycleScope,
 } from "../../policies/ticket-lifecycle-access.policy";
 import type { ResolveTicketBody } from "../../ticket.schemas";
+import {
+  NotificationType,
+} from "../../../../generated/prisma/client";
+import { createNotifications } from "../../../notifications/notification.service";
+
 
 const ticketInclude = {
   requester: {
@@ -192,6 +197,15 @@ export async function resolveTicketUseCase(
           ? body.reason!.trim()
           : "Ticket resolved by assigned technician.",
       },
+    });
+
+    // Notify the requester that the ticket has been resolved.
+    await createNotifications(tx, {
+      recipientIds: [ticket.requesterId],
+      type: NotificationType.TICKET_RESOLVED,
+      title: "Ticket resolved",
+      message: `Ticket #${ticket.id} has been resolved. Please review the resolution and confirm closure when ready.`,
+      ticketId: ticket.id,
     });
 
     return tx.ticket.findUniqueOrThrow({

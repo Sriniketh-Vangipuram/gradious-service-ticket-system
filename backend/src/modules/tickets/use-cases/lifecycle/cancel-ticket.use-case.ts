@@ -12,6 +12,12 @@ import {
   assertTicketLifecycleAccess,
   getTicketLifecycleScope,
 } from "../../policies/ticket-lifecycle-access.policy";
+import {
+  NotificationType,
+} from "../../../../generated/prisma/client";
+import { createNotifications } from "../../../notifications/notification.service";
+
+
 
 const ticketInclude = {
   requester: {
@@ -110,6 +116,21 @@ export async function cancelTicketUseCase(
         toValue: TicketStatus.CANCELLED,
         description: body.reason,
       },
+    });
+
+    // Notify the requester and assigned technician about cancellation.
+    const recipientIds: number[] = [ticket.requesterId];
+
+    if (ticket.assigneeId !== null) {
+      recipientIds.push(ticket.assigneeId);
+    }
+
+    await createNotifications(tx, {
+      recipientIds,
+      type: NotificationType.TICKET_STATUS_CHANGED,
+      title: "Ticket cancelled",
+      message: `Ticket #${ticket.id} has been cancelled.`,
+      ticketId: ticket.id,
     });
 
     return tx.ticket.findUniqueOrThrow({

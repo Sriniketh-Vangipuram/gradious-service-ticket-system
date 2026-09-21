@@ -10,6 +10,12 @@ import {
   assertTicketLifecycleAccess,
   getTicketLifecycleScope,
 } from "../../policies/ticket-lifecycle-access.policy";
+import { createNotifications } from "../../../notifications/notification.service";
+import {
+  NotificationType,
+} from "../../../../generated/prisma/client";
+
+
 
 const ticketInclude = {
   requester: {
@@ -114,6 +120,18 @@ export async function confirmTicketClosureUseCase(
         description: "Ticket closed by requester confirmation.",
       },
     });
+
+    // Notify the assigned technician that the requester closed the ticket.
+    if (ticket.assigneeId !== null) {
+      await createNotifications(tx, {
+        recipientIds: [ticket.assigneeId],
+        type: NotificationType.TICKET_STATUS_CHANGED,
+        title: "Ticket closed",
+        message: `Ticket #${ticket.id} was closed by the requester.`,
+        ticketId: ticket.id,
+      });
+    }
+
 
     return tx.ticket.findUniqueOrThrow({
       where: { id: ticket.id },

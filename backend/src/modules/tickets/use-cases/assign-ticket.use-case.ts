@@ -11,6 +11,12 @@ import { AppError } from "../../../common/errors/app-error";
 import type { TicketAssignmentActor } from "../policies/ticket-assignment-scope.policy";
 import { buildTicketAssignmentScope } from "../policies/ticket-assignment-scope.policy";
 import type { AssignTicketBody } from "../ticket.schemas";
+import {
+  NotificationType,
+} from "../../../generated/prisma/client";
+
+import { createNotifications } from "../../notifications/notification.service";
+
 
 const ticketInclude = {
   requester: {
@@ -57,6 +63,7 @@ export async function assignTicketUseCase(
       select: {
         id: true,
         centerId: true,
+        requesterId:true,
         assigneeId: true,
       },
     });
@@ -137,7 +144,34 @@ export async function assignTicketUseCase(
       },
     });
 
-    // 6. Return the updated ticket with safe related data.
+    // 6. Notify the relevant people about the assignment change.
+    const recipientIds: number[] = [ticket.requesterId];
+
+    if (newAssigneeId !== null) {
+      recipientIds.push(newAssigneeId);
+    } else if (ticket.assigneeId !== null) {
+      recipientIds.push(ticket.assigneeId);
+    }
+
+    const isUnassigned = newAssigneeId === null;
+
+    await createNotifications(tx, {
+      recipientIds,
+      type: NotificationType.TICKET_ASSIGNED,
+      title: isUnassigned
+        ? "Ticket unassigned"
+        : ticket.assigneeId === null
+          ? "Ticket assigned to you"
+          : "Ticket reassigned",
+      message: isUnassigned
+        ? `Ticket #${ticket.id} has been unassigned.`
+        : `Ticket #${ticket.id} has been ${
+            ticket.assigneeId === null ? "assigned" : "reassigned"
+          }.`,
+      ticketId: ticket.id,
+    });
+
+    // 7. Return the updated ticket with safe related data.
     return tx.ticket.findUniqueOrThrow({
       where: { id: ticket.id },
       include: ticketInclude,

@@ -13,6 +13,14 @@ import {
   getTicketLifecycleScope,
 } from "../../policies/ticket-lifecycle-access.policy";
 
+import { addBusinessMinutes } from "../../../sla/business-calendar.service";
+import { getActiveSlaPolicy } from "../../../sla/sla-policy.service";
+
+import {
+  NotificationType,
+} from "../../../../generated/prisma/client";
+import { createNotifications } from "../../../notifications/notification.service";
+
 const ticketInclude = {
   requester: {
     select: { id: true, fullName: true, email: true },
@@ -46,6 +54,7 @@ export async function reopenTicketUseCase(
         requesterId: true,
         assigneeId: true,
         centerId: true,
+        priority:true,
       },
     });
 
@@ -98,6 +107,47 @@ export async function reopenTicketUseCase(
       );
     }
 
+    // Start a new resolution SLA cycle for the reopened ticket.
+      const slaPolicy = await getActiveSlaPolicy(ticket.priority, tx);
+
+      const slaStartedAt = new Date();
+
+      const resolutionDueAt = await addBusinessMinutes({
+        startAt: slaStartedAt,
+        businessMinutes: slaPolicy.resolutionMinutes,
+        centerId: ticket.centerId,
+        db: tx,
+      });
+
+      // Determine the next cycle number for this ticket.
+      const latestCycle = await tx.ticketSlaCycle.findFirst({
+        where: { ticketId: ticket.id },
+        orderBy: { cycleNumber: "desc" },
+        select: { cycleNumber: true },
+      });
+
+      const nextCycleNumber = (latestCycle?.cycleNumber ?? 0) + 1;
+
+      await tx.ticketSlaCycle.create({
+        data: {
+          ticketId: ticket.id,
+          cycleNumber: nextCycleNumber,
+          startedAt: slaStartedAt,
+          dueAt: resolutionDueAt,
+          targetMinutes: slaPolicy.resolutionMinutes,
+          atRiskThresholdPercent: slaPolicy.atRiskThresholdPercent,
+        },
+      });
+
+    // Update the ticket's current resolution SLA snapshot.
+    await tx.ticket.update({
+      where: { id: ticket.id },
+      data: {
+        resolutionDueAt,
+        resolutionTargetMinutes: slaPolicy.resolutionMinutes,
+      },
+    });
+
     await tx.ticketHistory.create({
       data: {
         ticketId: ticket.id,
@@ -107,6 +157,21 @@ export async function reopenTicketUseCase(
         toValue: TicketStatus.IN_PROGRESS,
         description: body.reason,
       },
+    });
+
+    // Notify the requester and assigned technician about reopening.
+    const recipientIds: number[] = [ticket.requesterId];
+
+    if (ticket.assigneeId !== null) {
+      recipientIds.push(ticket.assigneeId);
+    }
+
+    await createNotifications(tx, {
+      recipientIds,
+      type: NotificationType.TICKET_REOPENED,
+      title: "Ticket reopened",
+      message: `Ticket #${ticket.id} has been reopened and moved to IN_PROGRESS.`,
+      ticketId: ticket.id,
     });
 
     return tx.ticket.findUniqueOrThrow({

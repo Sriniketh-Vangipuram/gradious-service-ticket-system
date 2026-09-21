@@ -3,14 +3,20 @@ import { createServer } from "node:http";
 import { app } from "./app";
 import { env } from "./config/env";
 import { prisma } from "./config/database";
+import { startSlaAlertScheduler } from "./modules/notifications/sla-alert.scheduler";
+
 
 const server = createServer(app);
+
+let stopSlaAlertScheduler: (() => void) | undefined;
 
 const startServer = async (): Promise<void> => {
   try {
     await prisma.$connect();
 
     console.log("Database connected");
+
+    stopSlaAlertScheduler = startSlaAlertScheduler();
 
     server.listen(env.PORT, () => {
       console.log(
@@ -28,6 +34,9 @@ const startServer = async (): Promise<void> => {
 
 const shutdown = async (signal: string): Promise<void> => {
   console.log(`${signal} received. Shutting down gracefully...`);
+  
+  stopSlaAlertScheduler?.();
+  console.log("[SLA Scheduler] Shutting down gracefully.")
 
   server.close(async () => {
     await prisma.$disconnect();

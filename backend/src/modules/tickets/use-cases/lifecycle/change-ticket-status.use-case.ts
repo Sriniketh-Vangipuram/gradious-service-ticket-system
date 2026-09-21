@@ -21,6 +21,12 @@ import {
   getTicketLifecycleScope,
 } from "../../policies/ticket-lifecycle-access.policy";
 
+import { createNotifications } from "../../../notifications/notification.service";
+
+import {
+  NotificationType,
+} from "../../../../generated/prisma/client";
+
 import type { TicketLifecycleAction } from "../../policies/ticket-lifecycle-access.policy";
 
 const ticketInclude = {
@@ -231,7 +237,22 @@ export async function changeTicketStatusUseCase(
       },
     });
 
-    // 7. Return the updated ticket with safe related data.
+    // 7. Notify the requester and assigned technician about the status change.
+    const recipientIds: number[] = [ticket.requesterId];
+
+    if (ticket.assigneeId !== null) {
+      recipientIds.push(ticket.assigneeId);
+    }
+
+    await createNotifications(tx, {
+      recipientIds,
+      type: NotificationType.TICKET_STATUS_CHANGED,
+      title: "Ticket status updated",
+      message: `Ticket #${ticket.id} status changed from ${ticket.status} to ${nextStatus}.`,
+      ticketId: ticket.id,
+    });
+
+    // 8. Return the updated ticket with safe related data.
     return tx.ticket.findUniqueOrThrow({
       where: { id: ticket.id },
       include: ticketInclude,

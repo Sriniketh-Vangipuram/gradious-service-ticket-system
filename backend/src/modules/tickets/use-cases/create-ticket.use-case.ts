@@ -7,6 +7,12 @@ import type { CreateTicketInput } from "../ticket.schemas";
 import { reserveTicketNumber } from "../ticket-number.service";
 import { addBusinessMinutes } from "../../sla/business-calendar.service";
 import { getActiveSlaPolicy } from "../../sla/sla-policy.service";
+import {
+  NotificationType,
+} from "../../../generated/prisma/client";
+
+import { createNotifications } from "../../notifications/notification.service";
+
 
 
 type AuthenticatedActor = {
@@ -262,12 +268,14 @@ export async function createTicketUseCase(
                     resolutionDueAt,
                     firstResponseTargetMinutes: slaPolicy.firstResponseMinutes,
                     resolutionTargetMinutes: slaPolicy.resolutionMinutes,
+                    atRiskThresholdPercent:slaPolicy.atRiskThresholdPercent,
                     slaCycles: {
                         create: {
                             cycleNumber: 1,
                             startedAt: slaStartedAt,
                             dueAt: resolutionDueAt,
-                            targetMinutes: slaPolicy.resolutionMinutes
+                            targetMinutes: slaPolicy.resolutionMinutes,
+                            atRiskThresholdPercent:slaPolicy.atRiskThresholdPercent,
                         }
                     },
 
@@ -299,6 +307,41 @@ export async function createTicketUseCase(
                     createdAt:true,
                     updatedAt:true,
                 },
+            });
+
+            //13. Find active staff members who have access to this center.
+            const staffMemberships = await tx.userCenter.findMany({
+                where:{
+                    centerId: input.centerId,
+                    user:{
+                        isActive:true,
+                        role:{
+                            in:[
+                                UserRole.TECHNICIAN,
+                                UserRole.CENTER_MANAGER,
+                                UserRole.ADMIN,
+                            ],
+                        },
+                    },
+                },
+
+                select:{
+                    userId:true,
+                },
+            });
+
+            const staffRecipientIds = staffMemberships.map((membership)=>membership.userId);
+
+            // 14. Persist ticket-created notifications atomically.
+            await createNotifications(tx,{
+                recipientIds:[
+                    requester.id,
+                    ...staffRecipientIds,
+                ],
+                type:NotificationType.TICKET_CREATED,
+                title:"New service ticket created",
+                message:`Ticket ${ticket.ticketNumber}-${ticket.title} has been created.`,
+                ticketId:ticket.id,
             });
 
 

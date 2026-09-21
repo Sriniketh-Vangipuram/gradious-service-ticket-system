@@ -15,6 +15,9 @@ import {
   getBusinessMinutesBetween,
 } from "../../sla/business-calendar.service";
 
+import { NotificationType } from "../../../generated/prisma/client";
+import { createNotifications } from "../../notifications/notification.service";
+
 
 const commentInclude = {
   author: {
@@ -76,6 +79,7 @@ export async function createTicketComment(
       where: ticketScope,
       select: {
         id: true,
+        ticketNumber:true,
         status: true,
         requesterId: true,
         assigneeId: true,
@@ -242,6 +246,18 @@ export async function createTicketComment(
             description:
               "Ticket resumed after a public requester reply.",
           },
+        });
+      }
+
+      // Notify the assigned technician that the requester has responded.
+      if (ticket.assigneeId !== null) {
+        await createNotifications(tx, {
+          recipientIds: [ticket.assigneeId],
+          type: NotificationType.TICKET_STATUS_CHANGED,
+          title: "Employee responded to your query",
+          message: `The requester has replied to ticket ${ticket.ticketNumber}. The ticket is now IN_PROGRESS.`,
+          ticketId: ticket.id,
+          dedupeKey: `ticket:${ticket.id}:requester-reply:comment:${comment.id}`,
         });
       }
 
