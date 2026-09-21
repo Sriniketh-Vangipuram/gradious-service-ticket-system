@@ -8,7 +8,9 @@ import { startSlaAlertScheduler } from "./modules/notifications/sla-alert.schedu
 
 const server = createServer(app);
 
-let stopSlaAlertScheduler: (() => void) | undefined;
+let isShuttingDown = false;
+
+let stopSlaAlertScheduler: (() => Promise<void>) | undefined;
 
 const startServer = async (): Promise<void> => {
   try {
@@ -33,19 +35,35 @@ const startServer = async (): Promise<void> => {
 };
 
 const shutdown = async (signal: string): Promise<void> => {
+  if (isShuttingDown) {
+    console.log(`[Server] Shutdown already in progress; ignoring ${signal}.`);
+    return;
+  }
+
+  isShuttingDown = true;
+
   console.log(`${signal} received. Shutting down gracefully...`);
-  
+
   stopSlaAlertScheduler?.();
-  console.log("[SLA Scheduler] Shutting down gracefully.")
 
-  server.close(async () => {
+  server.close(async (error) => {
+  try {
+    if (error) {
+      console.error("[Server] Error while closing HTTP server:", error);
+      process.exitCode = 1;
+    }
+
+    await stopSlaAlertScheduler?.();
+
     await prisma.$disconnect();
-
-    console.log("HTTP server closed");
-    console.log("Database connection closed");
-
-    process.exit(0);
-  });
+    console.log("[Server] Database connection closed.");
+  } catch (shutdownError) {
+    console.error("[Server] Error during shutdown:", shutdownError);
+    process.exitCode = 1;
+  } finally {
+    console.log("[Server] Shutdown complete.");
+  }
+});
 };
 
 process.on("SIGTERM", () => {

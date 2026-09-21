@@ -1,43 +1,45 @@
 import { checkSlaAlerts } from "./sla-alert.service";
 
-const SLA_ALERT_INTERVAL_MS = 60_000; // 60 seconds
+const SLA_ALERT_INTERVAL_MS = 60_000;
 
-export function startSlaAlertScheduler(): () => void {
-  let isRunning = false;
+export function startSlaAlertScheduler(): () => Promise<void> {
+  let activeScan: Promise<void> | undefined;
 
-  const runSlaAlertCheck = async (): Promise<void> => {
+  const startScan = (): void => {
     // Prevent overlapping scans within this process.
-    if (isRunning) {
-      console.warn("[SLA Scheduler] Previous scan is still running; skipping.");
+    if (activeScan) {
+      console.warn(
+        "[SLA Scheduler] Previous scan is still running; skipping.",
+      );
       return;
     }
 
-    isRunning = true;
-
-    try {
-      await checkSlaAlerts();
-      console.log("[SLA Scheduler] SLA alert scan completed.");
-    } catch (error) {
-      console.error("[SLA Scheduler] SLA alert scan failed:", error);
-    } finally {
-      isRunning = false;
-    }
+    activeScan = checkSlaAlerts()
+      .then(() => {
+        console.log("[SLA Scheduler] SLA alert scan completed.");
+      })
+      .catch((error: unknown) => {
+        console.error("[SLA Scheduler] SLA alert scan failed:", error);
+      })
+      .finally(() => {
+        activeScan = undefined;
+      });
   };
 
-  // Run once at startup, then every 60 seconds.
-  void runSlaAlertCheck();
+  startScan();
 
-  const interval = setInterval(() => {
-    void runSlaAlertCheck();
-  }, SLA_ALERT_INTERVAL_MS);
+  const interval = setInterval(startScan, SLA_ALERT_INTERVAL_MS);
 
   console.log(
     `[SLA Scheduler] Started. Interval: ${SLA_ALERT_INTERVAL_MS / 1000}s.`,
   );
 
-  // Return a stop function for graceful shutdown.
-  return () => {
+  return async (): Promise<void> => {
     clearInterval(interval);
+
+    // Wait for an already-running scan to finish before shutdown continues.
+    await activeScan;
+
     console.log("[SLA Scheduler] Stopped.");
   };
 }

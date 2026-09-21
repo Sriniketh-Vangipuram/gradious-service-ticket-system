@@ -39,6 +39,8 @@ model User {
   notifications        Notification[]
   auditLogs            AuditLog[]          @relation("AuditLogActor")
   refreshSessions      RefreshSession[]
+  idempotencyRecords IdempotencyRecord[]
+
   // Optional primary/home center
   centerId             Int?
   center               Center?             @relation("UserPrimaryCenter", fields: [centerId], references: [id], onDelete: SetNull)
@@ -473,4 +475,21 @@ model RefreshSession {
 model TicketNumberCounter {
   year     Int @id
   sequence Int @default(0)
+}
+
+model IdempotencyRecord {
+  id             Int      @id @default(autoincrement())
+
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  key            String   @db.VarChar(128)
+  requestHash    String   @db.Char(64)
+  responseStatus Int?
+  responseBody   Json?
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+
+  @@unique([userId, key])
+  @@index([expiresAt])
 }

@@ -26,37 +26,56 @@ import { reopenTicketBodySchema } from "./ticket.schemas";
 import { reopenTicketUseCase } from "./use-cases/lifecycle/reopen-ticket.use-case";
 import { cancelTicketBodySchema } from "./ticket.schemas";
 import { cancelTicketUseCase } from "./use-cases/lifecycle/cancel-ticket.use-case";
-
+import { createSuccessBody } from "../../common/http/api-response";
 
 export async function createTicketController(
-    req:Request,
-    res:Response,
-    next:NextFunction,
-):Promise<void>{
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const input = getValidatedData(
+      req,
+      { body: createTicketSchema },
+      "body",
+    );
 
-    try{
-        const input = getValidatedData(
-            req,
-            {body : createTicketSchema},
-            "body",
-        );
+    const actor = req.authUser;
 
-        const actor = req.authUser;
-
-        if(!actor){
-            return next(
-                new Error("Authenticated user missing after requireAuth middleware."),
-            );
-        }
-
-        const ticket = await createTicketUseCase(input,actor);
-
-        sendSuccess( res,{ ticket }, 201);
-
+    if (!actor) {
+      return next(
+        new Error(
+          "Authenticated user missing after requireAuth middleware.",
+        ),
+      );
     }
-    catch(error){
-        next(error);
+
+    const idempotencyKey = req.get("Idempotency-Key");
+
+    if (
+      !idempotencyKey ||
+      idempotencyKey.length < 8 ||
+      idempotencyKey.length > 128 ||
+      !/^[\x21-\x7E]+$/.test(idempotencyKey)
+    ) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "A valid Idempotency-Key header is required (8–128 printable ASCII characters).",
+      );
     }
+
+    const result = await createTicketUseCase(
+      input,
+      actor,
+      idempotencyKey,
+    );
+
+    res
+      .status(result.responseStatus)
+      .json(result.responseBody);
+  } catch (error) {
+    next(error);
+  }
 }
 
 export async function getTicketController(

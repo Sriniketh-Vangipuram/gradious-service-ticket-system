@@ -10,6 +10,8 @@ import { healthRouter } from "./routes/health.routes";
 import { errorMiddleware } from "./common/errors/error.middleware";
 import ticketRouter from "./modules/tickets/ticket.routes";
 import notificationRoutes from "./modules/notifications/notification.routes";
+import { env } from "./config/env";
+import crypto from "node:crypto";
 
 export const app = express();
 
@@ -19,7 +21,7 @@ app.use(helmet());
 
 app.use(
   cors({
-    origin: true,
+    origin: env.FRONTEND_URL,
     credentials: true
   })
 );
@@ -29,7 +31,17 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(cookieParser());
 
-app.use(pinoHttp());
+app.use(
+  pinoHttp({
+    genReqId: (req, res) => {
+      const requestId = crypto.randomUUID();
+
+      res.setHeader("X-Request-Id", requestId);
+
+      return requestId;
+    },
+  }),
+);
 
 app.use("/api/v1/health", healthRouter);
 app.use("/api/v1/auth",authRouter);

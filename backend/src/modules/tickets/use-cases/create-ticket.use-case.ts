@@ -12,7 +12,9 @@ import {
 } from "../../../generated/prisma/client";
 
 import { createNotifications } from "../../notifications/notification.service";
-
+import { createHash } from "node:crypto";
+import { Prisma } from "../../../generated/prisma/client";
+import { createSuccessBody } from "../../../common/http/api-response";
 
 
 type AuthenticatedActor = {
@@ -20,10 +22,21 @@ type AuthenticatedActor = {
     role: string;
 };
 
+function isPrismaUniqueConstraintError(
+  error: unknown,
+): error is Prisma.PrismaClientKnownRequestError {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
+
+
 export async function createTicketUseCase(
-    input:CreateTicketInput,
-    actor: AuthenticatedActor,
-){
+  input: CreateTicketInput,
+  actor: AuthenticatedActor,
+  idempotencyKey: string,
+) {
 
     // 1.Verify the actor's role.
     const allowedRoles:string[] =[
@@ -48,7 +61,21 @@ export async function createTicketUseCase(
         );
     }
 
-    return prisma.$transaction(async(tx)=>{
+    const requestHash = createHash("sha256")
+        .update(JSON.stringify(input))
+        .digest("hex");
+
+    try {
+        return await prisma.$transaction(async (tx) => {
+            await tx.idempotencyRecord.create({
+            data: {
+                userId: actor.userId,
+                key: idempotencyKey,
+                requestHash,
+                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            },
+        });
+        
         // 3.Confirm the requester exists and is active.
         const requester = await tx.user.findUnique({
             where:{id: actor.userId},
@@ -345,6 +372,80 @@ export async function createTicketUseCase(
             });
 
 
-            return ticket;
-    })
+            const responseBody = createSuccessBody({ ticket });
+
+            await tx.idempotencyRecord.update({
+            where: {
+                userId_key: {
+                userId: actor.userId,
+                key: idempotencyKey,
+                },
+            },
+            data: {
+                responseStatus: 201,
+                responseBody,
+            },
+            });
+
+            return {
+            ticket,
+            replayed: false,
+            responseStatus: 201,
+            responseBody,
+            };
+    });
+
+    } catch (error) {
+    if (!isPrismaUniqueConstraintError(error)) {
+        throw error;
+    }
+
+    // The transaction has failed and rolled back.
+    // Check whether this user/key already has a committed record.
+    const existingRecord = await prisma.idempotencyRecord.findUnique({
+        where: {
+        userId_key: {
+            userId: actor.userId,
+            key: idempotencyKey,
+        },
+        },
+        select: {
+        requestHash: true,
+        responseStatus: true,
+        responseBody: true,
+        },
+    });
+
+    // A different unique constraint may have caused P2002.
+    // If no idempotency record exists, preserve the original error.
+    if (!existingRecord) {
+        throw error;
+    }
+
+    if (existingRecord.requestHash !== requestHash) {
+        throw new AppError(
+        "CONFLICT",
+        "This Idempotency-Key has already been used with a different request.",
+        );
+    }
+
+    // A committed record should contain the response because the
+    // record and response are written in the same transaction.
+    if (
+        existingRecord.responseStatus === null ||
+        existingRecord.responseBody === null
+    ) {
+        throw new AppError(
+        "CONFLICT",
+        "This request is already being processed. Please retry shortly.",
+        );
+    }
+
+    return {
+        ticket: null,
+        replayed: true,
+        responseStatus: existingRecord.responseStatus,
+        responseBody: existingRecord.responseBody,
+    };
+    }
 }
