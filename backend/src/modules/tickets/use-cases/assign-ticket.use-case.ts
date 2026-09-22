@@ -16,7 +16,7 @@ import {
 } from "../../../generated/prisma/client";
 
 import { createNotifications } from "../../notifications/notification.service";
-
+import { publishToUser } from "../../../socket/socket.server";
 
 const ticketInclude = {
   requester: {
@@ -56,7 +56,12 @@ export async function assignTicketUseCase(
   body: AssignTicketBody,
   actor: TicketAssignmentActor,
 ) {
-  return prisma.$transaction(async (tx) => {
+
+  let createdNotifications: Awaited<
+    ReturnType<typeof createNotifications>
+  > = [];
+
+  const result = await prisma.$transaction(async (tx) => {
     // 1. Confirm the actor can manage this ticket's assignment.
     const ticket = await tx.ticket.findFirst({
       where: buildTicketAssignmentScope(ticketId, actor),
@@ -76,10 +81,15 @@ export async function assignTicketUseCase(
 
     // 2. If the assignment is unchanged, do not create duplicate history.
     if (ticket.assigneeId === newAssigneeId) {
-      return tx.ticket.findUniqueOrThrow({
-        where: { id: ticket.id },
-        include: ticketInclude,
-      });
+      return {
+        ticket: await tx.ticket.findUniqueOrThrow({
+          where: { id: ticket.id },
+          include: ticketInclude,
+        }),
+        recipientIds: [] as number[],
+        assignmentEvent:null,
+        changed: false,
+      };
     }
 
     // 3. Validate the target technician, unless unassigning.
@@ -155,7 +165,7 @@ export async function assignTicketUseCase(
 
     const isUnassigned = newAssigneeId === null;
 
-    await createNotifications(tx, {
+    createdNotifications =await createNotifications(tx, {
       recipientIds,
       type: NotificationType.TICKET_ASSIGNED,
       title: isUnassigned
@@ -172,9 +182,39 @@ export async function assignTicketUseCase(
     });
 
     // 7. Return the updated ticket with safe related data.
-    return tx.ticket.findUniqueOrThrow({
-      where: { id: ticket.id },
-      include: ticketInclude,
-    });
+    return {
+      ticket: await tx.ticket.findUniqueOrThrow({
+        where: { id: ticket.id },
+        include: ticketInclude,
+      }),
+      recipientIds: [...new Set(recipientIds)],
+      assignmentEvent: event,
+      changed: true,
+    };
   });
+    if (result.changed) {
+      for (const userId of result.recipientIds) {
+        publishToUser(userId, "ticket:assignment_changed", {
+          ticketId: result.ticket.id,
+          centerId: result.ticket.centerId,
+          assigneeId: result.ticket.assigneeId,
+          assignmentEvent: result.assignmentEvent,
+        });
+      }
+    }
+
+    if (result.changed) {
+      for (const notification of createdNotifications) {
+        publishToUser(notification.userId, "notification:created", {
+          notificationId: notification.id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          ticketId: notification.ticketId,
+          createdAt: notification.createdAt,
+        });
+      }
+    }
+
+    return result.ticket;
 }

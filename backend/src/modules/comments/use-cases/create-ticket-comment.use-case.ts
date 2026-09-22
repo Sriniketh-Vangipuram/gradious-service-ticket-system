@@ -17,7 +17,7 @@ import {
 
 import { NotificationType } from "../../../generated/prisma/client";
 import { createNotifications } from "../../notifications/notification.service";
-
+import { publishToUser } from "../../../socket/socket.server";
 
 const commentInclude = {
   author: {
@@ -34,7 +34,14 @@ export async function createTicketComment(
   body: CreateTicketCommentBody,
   actor: AuthenticatedUser,
 ) {
-  return prisma.$transaction(async (tx) => {
+
+  let statusChanged = false;
+  let previousStatus: TicketStatus | null = null;
+  let createdNotifications: Awaited<
+    ReturnType<typeof createNotifications>
+  > = [];
+
+  const result = await prisma.$transaction(async (tx) => {
     // 1. Restrict the ticket lookup to tickets this actor may access.
     let ticketScope: Prisma.TicketWhereInput;
 
@@ -165,6 +172,7 @@ export async function createTicketComment(
           );
         }
 
+        previousStatus = ticket.status;
         const ticketUpdateResult = await tx.ticket.updateMany({
           where: {
             id: ticket.id,
@@ -183,7 +191,7 @@ export async function createTicketComment(
           );
         }
 
-
+        statusChanged = true;
 
         // Use the persisted comment timestamp as the resume instant.
         const resumedAt = comment.createdAt;
@@ -251,7 +259,7 @@ export async function createTicketComment(
 
       // Notify the assigned technician that the requester has responded.
       if (ticket.assigneeId !== null) {
-        await createNotifications(tx, {
+        createdNotifications = await createNotifications(tx, {
           recipientIds: [ticket.assigneeId],
           type: NotificationType.TICKET_STATUS_CHANGED,
           title: "Employee responded to your query",
@@ -261,6 +269,71 @@ export async function createTicketComment(
         });
       }
 
-    return comment;
+    const recipientIds: number[] = [];
+
+    if (body.visibility === CommentVisibility.PUBLIC) {
+      recipientIds.push(ticket.requesterId);
+
+      if (ticket.assigneeId !== null) {
+        recipientIds.push(ticket.assigneeId);
+      }
+    } else {
+      // INTERNAL comments must never be delivered to the requester.
+      if (ticket.assigneeId !== null) {
+        recipientIds.push(ticket.assigneeId);
+      }
+    }
+
+    return {
+      comment,
+      recipientIds: [...new Set(recipientIds)],
+      statusChanged,
+      previousStatus,
+      ticket: {
+        id: ticket.id,
+        ticketNumber: ticket.ticketNumber,
+        centerId: ticket.centerId,
+      },
+    };
   });
+
+  for (const userId of result.recipientIds) {
+    publishToUser(userId, "ticket:comment_created", {
+      ticketId: result.ticket.id,
+      ticketNumber: result.ticket.ticketNumber,
+      centerId: result.ticket.centerId,
+      comment: {
+        id: result.comment.id,
+        author: result.comment.author,
+        content: result.comment.content,
+        visibility: result.comment.visibility,
+        createdAt: result.comment.createdAt,
+      },
+    });
+  }
+
+  if (result.statusChanged && result.previousStatus !== null) {
+    for (const userId of result.recipientIds) {
+      publishToUser(userId, "ticket:status_changed", {
+        ticketId: result.ticket.id,
+        centerId: result.ticket.centerId,
+        previousStatus: result.previousStatus,
+        status: TicketStatus.IN_PROGRESS,
+        updatedAt: result.comment.createdAt,
+      });
+    }
+  }
+
+  for (const notification of createdNotifications) {
+    publishToUser(notification.userId, "notification:created", {
+      notificationId: notification.id,
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      ticketId: notification.ticketId,
+      createdAt: notification.createdAt,
+    });
+  }
+
+  return result.comment;
 }

@@ -11,6 +11,7 @@ import { prisma } from "../../../../config/database";
 import { AppError } from "../../../../common/errors/app-error";
 
 import type { AuthenticatedUser } from "../../../../middleware/auth.middleware";
+import { publishToUser } from "../../../../socket/socket.server";
 
 import {
   assertValidTicketTransition,
@@ -104,7 +105,11 @@ export async function changeTicketStatusUseCase(
     );
   }
 
-  return prisma.$transaction(async (tx) => {
+  let createdNotifications: Awaited<
+    ReturnType<typeof createNotifications>
+  > = [];
+
+  const result = await prisma.$transaction(async (tx) => {
     // 2. Fetch the ticket within the actor's permitted scope.
     const scope = getTicketLifecycleScope(actor, action, ticketId);
 
@@ -244,7 +249,7 @@ export async function changeTicketStatusUseCase(
       recipientIds.push(ticket.assigneeId);
     }
 
-    await createNotifications(tx, {
+    createdNotifications = await createNotifications(tx, {
       recipientIds,
       type: NotificationType.TICKET_STATUS_CHANGED,
       title: "Ticket status updated",
@@ -253,9 +258,39 @@ export async function changeTicketStatusUseCase(
     });
 
     // 8. Return the updated ticket with safe related data.
-    return tx.ticket.findUniqueOrThrow({
-      where: { id: ticket.id },
-      include: ticketInclude,
-    });
+    return {
+      ticket: await tx.ticket.findUniqueOrThrow({
+        where: { id: ticket.id },
+        include: ticketInclude,
+      }),
+      previousStatus: ticket.status,
+    };
   });
+
+      const recipientIds = [
+        result.ticket.requesterId,
+        result.ticket.assigneeId,
+      ].filter((userId): userId is number => userId !== null);
+
+      for (const userId of [...new Set(recipientIds)]) {
+        publishToUser(userId, "ticket:status_changed", {
+          ticketId: result.ticket.id,
+          centerId: result.ticket.centerId,
+          previousStatus: result.previousStatus,
+          status: result.ticket.status,
+          updatedAt: result.ticket.updatedAt,
+        });
+      }
+      for (const notification of createdNotifications) {
+        publishToUser(notification.userId, "notification:created", {
+          notificationId: notification.id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          ticketId: notification.ticketId,
+          createdAt: notification.createdAt,
+        });
+      }
+      
+      return result.ticket;
 }

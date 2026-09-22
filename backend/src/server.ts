@@ -4,9 +4,11 @@ import { app } from "./app";
 import { env } from "./config/env";
 import { prisma } from "./config/database";
 import { startSlaAlertScheduler } from "./modules/notifications/sla-alert.scheduler";
-
+import { initializeSocketServer } from "./socket/socket.server";
 
 const server = createServer(app);
+
+const io = initializeSocketServer(server);
 
 let isShuttingDown = false;
 
@@ -43,8 +45,6 @@ const shutdown = async (signal: string): Promise<void> => {
   isShuttingDown = true;
 
   console.log(`${signal} received. Shutting down gracefully...`);
-
-  stopSlaAlertScheduler?.();
 
   server.close(async (error) => {
   try {

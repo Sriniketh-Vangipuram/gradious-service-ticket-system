@@ -15,7 +15,7 @@ import { createNotifications } from "../../notifications/notification.service";
 import { createHash } from "node:crypto";
 import { Prisma } from "../../../generated/prisma/client";
 import { createSuccessBody } from "../../../common/http/api-response";
-
+import { publishToUser } from "../../../socket/socket.server";
 
 type AuthenticatedActor = {
     userId: number;
@@ -64,9 +64,20 @@ export async function createTicketUseCase(
     const requestHash = createHash("sha256")
         .update(JSON.stringify(input))
         .digest("hex");
-
+    
+    let eventRecipientIds: number[] = [];
+    let createdNotifications: Array<{
+    id: number;
+    userId: number;
+    type: NotificationType;
+    title: string;
+    message: string;
+    ticketId: number | null;
+    createdAt: Date;
+    }> = [];
+    
     try {
-        return await prisma.$transaction(async (tx) => {
+        const result =  await prisma.$transaction(async (tx) => {
             await tx.idempotencyRecord.create({
             data: {
                 userId: actor.userId,
@@ -360,7 +371,7 @@ export async function createTicketUseCase(
             const staffRecipientIds = staffMemberships.map((membership)=>membership.userId);
 
             // 14. Persist ticket-created notifications atomically.
-            await createNotifications(tx,{
+            createdNotifications = await createNotifications(tx,{
                 recipientIds:[
                     requester.id,
                     ...staffRecipientIds,
@@ -387,6 +398,11 @@ export async function createTicketUseCase(
             },
             });
 
+            eventRecipientIds=[
+                requester.id,
+                ...staffRecipientIds,
+            ];
+
             return {
             ticket,
             replayed: false,
@@ -394,6 +410,37 @@ export async function createTicketUseCase(
             responseBody,
             };
     });
+
+    if (!result.replayed) {
+    for (const userId of eventRecipientIds) {
+        publishToUser(userId, "ticket:created", {
+        ticketId: result.ticket.id,
+        ticketNumber: result.ticket.ticketNumber,
+        centerId: result.ticket.centerId,
+        status: result.ticket.status,
+        createdAt: result.ticket.createdAt,
+        });
+    }
+    }
+
+    if (!result.replayed) {
+        for (const notification of createdNotifications) {
+            publishToUser(
+            notification.userId,
+            "notification:created",
+            {
+                notificationId: notification.id,
+                type: notification.type,
+                title: notification.title,
+                message: notification.message,
+                ticketId: notification.ticketId,
+                createdAt: notification.createdAt,
+            },
+            );
+        }
+        }
+
+    return result;
 
     } catch (error) {
     if (!isPrismaUniqueConstraintError(error)) {

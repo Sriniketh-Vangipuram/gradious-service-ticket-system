@@ -10,6 +10,7 @@ import {
   TicketPriority,
   UserRole,
 } from "../../generated/prisma/client";
+import { publishToUser } from "../../socket/socket.server";
 
 
 const TERMINAL_STATUSES: TicketStatus[] = [
@@ -51,8 +52,8 @@ async function persistSlaAlert(
     ticketId: number;
     dedupeKey: string;
   },
-): Promise<void> {
-  await createNotifications(tx, {
+) {
+  return createNotifications(tx, {
     ...input,
   });
 }
@@ -106,6 +107,11 @@ async function getSlaAlertRecipients(
 export async function checkSlaAlerts(
   now: Date = new Date(),
 ): Promise<void> {
+
+  let createdNotifications: Awaited<
+    ReturnType<typeof createNotifications>
+  > = [];
+
   await prisma.$transaction(async (tx) => {
     // 1. Find tickets whose first response is still pending.
     const tickets = await tx.ticket.findMany({
@@ -165,21 +171,23 @@ export async function checkSlaAlerts(
 
       const breached = state === "breached";
 
-      await persistSlaAlert(tx, {
-        recipientIds,
-        type: breached
-          ? NotificationType.SLA_BREACHED
-          : NotificationType.SLA_AT_RISK,
-        title: breached
-          ? "First-response SLA breached"
-          : "First-response SLA at risk",
-        message: breached
-          ? `Ticket ${ticket.ticketNumber} has exceeded its first-response SLA.`
-          : `Ticket ${ticket.ticketNumber} is approaching its first-response SLA deadline.`,
-        ticketId: ticket.id,
-        dedupeKey:
-          `ticket:${ticket.id}:first-response:${state}`,
-      });
+      createdNotifications.push(
+        ...(await persistSlaAlert(tx, {
+          recipientIds,
+          type: breached
+            ? NotificationType.SLA_BREACHED
+            : NotificationType.SLA_AT_RISK,
+          title: breached
+            ? "First-response SLA breached"
+            : "First-response SLA at risk",
+          message: breached
+            ? `Ticket ${ticket.ticketNumber} has exceeded its first-response SLA.`
+            : `Ticket ${ticket.ticketNumber} is approaching its first-response SLA deadline.`,
+          ticketId: ticket.id,
+          dedupeKey:
+            `ticket:${ticket.id}:first-response:${state}`,
+        })),
+      );
     }
 
     // 2. Find active, unresolved, unpaused resolution SLA cycles.
@@ -204,7 +212,7 @@ export async function checkSlaAlerts(
             requesterId: true,
             assigneeId: true,
             centerId: true,
-            priority:true,
+            priority: true,
           },
         },
       },
@@ -234,29 +242,39 @@ export async function checkSlaAlerts(
         assigneeId: cycle.ticket.assigneeId,
         centerId: cycle.ticket.centerId,
         priority: cycle.ticket.priority,
-      });;
+      });
 
-      if (cycle.ticket.assigneeId !== null) {
-        recipientIds.push(cycle.ticket.assigneeId);
-      }
 
       const breached = state === "breached";
 
-      await persistSlaAlert(tx, {
-        recipientIds,
-        type: breached
-          ? NotificationType.SLA_BREACHED
-          : NotificationType.SLA_AT_RISK,
-        title: breached
-          ? "Resolution SLA breached"
-          : "Resolution SLA at risk",
-        message: breached
-          ? `Ticket ${cycle.ticket.ticketNumber} has exceeded its resolution SLA.`
-          : `Ticket ${cycle.ticket.ticketNumber} is approaching its resolution SLA deadline.`,
-        ticketId: cycle.ticketId,
-        dedupeKey:
-          `ticket:${cycle.ticketId}:cycle:${cycle.id}:resolution:${state}`,
-      });
-    }
-  });
+      createdNotifications.push(
+  ...(await persistSlaAlert(tx, {
+    recipientIds,
+    type: breached
+      ? NotificationType.SLA_BREACHED
+      : NotificationType.SLA_AT_RISK,
+    title: breached
+      ? "Resolution SLA breached"
+      : "Resolution SLA at risk",
+    message: breached
+      ? `Ticket ${cycle.ticket.ticketNumber} has exceeded its resolution SLA.`
+      : `Ticket ${cycle.ticket.ticketNumber} is approaching its resolution SLA deadline.`,
+    ticketId: cycle.ticketId,
+    dedupeKey:
+      `ticket:${cycle.ticketId}:cycle:${cycle.id}:resolution:${state}`,
+  })),
+);
+}
+});
+
+for (const notification of createdNotifications) {
+    publishToUser(notification.userId, "notification:created", {
+      notificationId: notification.id,
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      ticketId: notification.ticketId,
+      createdAt: notification.createdAt,
+    });
+  }
 }

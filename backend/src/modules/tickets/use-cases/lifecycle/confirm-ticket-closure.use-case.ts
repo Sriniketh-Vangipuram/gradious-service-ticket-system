@@ -14,6 +14,7 @@ import { createNotifications } from "../../../notifications/notification.service
 import {
   NotificationType,
 } from "../../../../generated/prisma/client";
+import { publishToUser } from "../../../../socket/socket.server";
 
 
 
@@ -54,7 +55,11 @@ export async function confirmTicketClosureUseCase(
   ticketId: number,
   actor: AuthenticatedUser,
 ) {
-  return prisma.$transaction(async (tx) => {
+
+  let createdNotifications: Awaited<
+    ReturnType<typeof createNotifications>
+  > = [];
+  const result = await prisma.$transaction(async (tx) => {
     const scope = getTicketLifecycleScope(
       actor,
       "CONFIRM_CLOSURE",
@@ -123,7 +128,7 @@ export async function confirmTicketClosureUseCase(
 
     // Notify the assigned technician that the requester closed the ticket.
     if (ticket.assigneeId !== null) {
-      await createNotifications(tx, {
+      createdNotifications = await createNotifications(tx, {
         recipientIds: [ticket.assigneeId],
         type: NotificationType.TICKET_STATUS_CHANGED,
         title: "Ticket closed",
@@ -133,9 +138,38 @@ export async function confirmTicketClosureUseCase(
     }
 
 
-    return tx.ticket.findUniqueOrThrow({
-      where: { id: ticket.id },
-      include: ticketInclude,
-    });
+    return {
+      ticket: await tx.ticket.findUniqueOrThrow({
+        where: { id: ticket.id },
+        include: ticketInclude,
+      }),
+      recipientIds: [
+        ticket.requesterId,
+        ...(ticket.assigneeId !== null ? [ticket.assigneeId] : []),
+      ],
+    };
   });
+
+    for (const userId of [...new Set(result.recipientIds)]) {
+    publishToUser(userId, "ticket:closed", {
+      ticketId: result.ticket.id,
+      centerId: result.ticket.centerId,
+      status: result.ticket.status,
+      closedAt: result.ticket.closedAt,
+      updatedAt: result.ticket.updatedAt,
+    });
+  }
+  
+  for (const notification of createdNotifications) {
+    publishToUser(notification.userId, "notification:created", {
+      notificationId: notification.id,
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      ticketId: notification.ticketId,
+      createdAt: notification.createdAt,
+    });
+  }
+
+  return result.ticket;
 }

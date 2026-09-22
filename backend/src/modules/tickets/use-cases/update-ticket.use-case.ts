@@ -10,6 +10,8 @@ import { AppError } from "../../../common/errors/app-error";
 import type { UpdateTicketBody } from "../ticket.schemas";
 import type { TicketUpdateActor } from "../policies/ticket-update-scope.policy";
 import { buildTicketUpdateScope } from "../policies/ticket-update-scope.policy";
+import { publishToUser } from "../../../socket/socket.server";
+
 
 const ticketInclude = {
   requester: {
@@ -120,7 +122,7 @@ export async function updateTicketUseCase(
   actor: TicketUpdateActor,
 ) {
   
-
+  let eventRecipientIds: number[] = [];
   const hasSoftwareId = body.softwareId !== undefined;
   const hasRequestType = body.requestType !== undefined;
 
@@ -131,7 +133,9 @@ export async function updateTicketUseCase(
     );
     }
 
-  return prisma.$transaction(async (tx) => {
+  
+
+  const result = await prisma.$transaction(async (tx) => {
     const scope = buildTicketUpdateScope(ticketId, actor);
 
     const existingTicket = await tx.ticket.findFirst({
@@ -312,7 +316,7 @@ export async function updateTicketUseCase(
 
     if (actor.role === UserRole.EMPLOYEE) {
     try {
-        return await tx.ticket.update({
+        const updatedTicket = await tx.ticket.update({
         where: {
             id: existingTicket.id,
             requesterId: actor.userId,
@@ -321,6 +325,18 @@ export async function updateTicketUseCase(
         data,
         include: ticketInclude,
         });
+
+        eventRecipientIds = [updatedTicket.requesterId];
+
+        if(updatedTicket.assigneeId!==null){
+          eventRecipientIds.push(updatedTicket.assigneeId);
+        }
+
+        return{
+          ticket:updatedTicket,
+          changed:true,
+        };
+
     } catch (error) {
         if (
         error instanceof
@@ -338,10 +354,35 @@ export async function updateTicketUseCase(
     }
     }
 
-    return tx.ticket.update({
-    where: { id: existingTicket.id },
-    data,
-    include: ticketInclude,
+    const updatedTicket = await tx.ticket.update({
+      where: { id: existingTicket.id },
+      data,
+      include: ticketInclude,
     });
+
+    eventRecipientIds = [updatedTicket.requesterId];
+
+    if (updatedTicket.assigneeId !== null) {
+      eventRecipientIds.push(updatedTicket.assigneeId);
+    }
+
+    return {
+      ticket: updatedTicket,
+      changed: true,
+    };
   });
+
+  if (result.changed) {
+  for (const userId of [...new Set(eventRecipientIds)]) {
+    publishToUser(userId, "ticket:updated", {
+      ticketId: result.ticket.id,
+      centerId: result.ticket.centerId,
+      status: result.ticket.status,
+      priority: result.ticket.priority,
+      updatedAt: result.ticket.updatedAt,
+    });
+  }
+}
+
+return result.ticket;
 }

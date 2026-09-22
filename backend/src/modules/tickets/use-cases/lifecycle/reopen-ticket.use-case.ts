@@ -20,6 +20,7 @@ import {
   NotificationType,
 } from "../../../../generated/prisma/client";
 import { createNotifications } from "../../../notifications/notification.service";
+import { publishToUser } from "../../../../socket/socket.server";
 
 const ticketInclude = {
   requester: {
@@ -43,7 +44,12 @@ export async function reopenTicketUseCase(
   body: ReopenTicketBody,
   actor: AuthenticatedUser,
 ) {
-  return prisma.$transaction(async (tx) => {
+
+  let createdNotifications: Awaited< 
+    ReturnType<typeof createNotifications>
+  > = [];
+
+  const result = await prisma.$transaction(async (tx) => {
     const scope = getTicketLifecycleScope(actor, "REOPEN", ticketId);
 
     const ticket = await tx.ticket.findFirst({
@@ -166,7 +172,7 @@ export async function reopenTicketUseCase(
       recipientIds.push(ticket.assigneeId);
     }
 
-    await createNotifications(tx, {
+    createdNotifications = await createNotifications(tx, {
       recipientIds,
       type: NotificationType.TICKET_REOPENED,
       title: "Ticket reopened",
@@ -174,9 +180,34 @@ export async function reopenTicketUseCase(
       ticketId: ticket.id,
     });
 
-    return tx.ticket.findUniqueOrThrow({
-      where: { id: ticket.id },
-      include: ticketInclude,
-    });
+    return {
+      ticket: await tx.ticket.findUniqueOrThrow({
+        where: { id: ticket.id },
+        include: ticketInclude,
+      }),
+      recipientIds,
+    };
   });
+  
+  for (const userId of [...new Set(result.recipientIds)]) {
+    publishToUser(userId, "ticket:reopened", {
+      ticketId: result.ticket.id,
+      centerId: result.ticket.centerId,
+      status: result.ticket.status,
+      updatedAt: result.ticket.updatedAt,
+    });
+  }
+
+  for (const notification of createdNotifications) {
+    publishToUser(notification.userId, "notification:created", {
+      notificationId: notification.id,
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      ticketId: notification.ticketId,
+      createdAt: notification.createdAt,
+    });
+  }
+
+  return result.ticket;
 }
