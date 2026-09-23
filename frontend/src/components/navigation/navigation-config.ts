@@ -1,7 +1,9 @@
 import {
   Bell,
+  ClipboardList,
   LayoutDashboard,
   PlusCircle,
+  ListTodo,
   Ticket,
   type LucideIcon,
 } from "lucide-react";
@@ -23,12 +25,7 @@ export const navigationItems: NavigationItem[] = [
     description: "Overview",
     to: ROUTES.app.dashboard,
     icon: LayoutDashboard,
-    roles: [
-      "EMPLOYEE",
-      "TECHNICIAN",
-      "CENTER_MANAGER",
-      "ADMIN",
-    ],
+    roles: ["EMPLOYEE"],
   },
   {
     label: "My Tickets",
@@ -43,6 +40,20 @@ export const navigationItems: NavigationItem[] = [
     to: ROUTES.app.createTicket,
     icon: PlusCircle,
     roles: ["EMPLOYEE"],
+  },
+  {
+    label: "Technician Dashboard",
+    description: "Support workload overview",
+    to: ROUTES.technician.dashboard,
+    icon: ListTodo,
+    roles: ["TECHNICIAN"],
+  },
+  {
+    label: "Ticket Queue",
+    description: "Manage service requests",
+    to: ROUTES.technician.queue,
+    icon: ClipboardList,
+    roles: ["TECHNICIAN"],
   },
   {
     label: "Notifications",

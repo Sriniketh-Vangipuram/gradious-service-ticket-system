@@ -24,7 +24,7 @@ export type ListTicketCommentsResponse =
 
 export interface CreateTicketCommentRequest {
   content: string;
-  visibility: "PUBLIC";
+  visibility: "PUBLIC" | "INTERNAL";
 }
 
 export type CreateTicketCommentResponse =

@@ -1,15 +1,16 @@
-import { NavLink, useLocation } from "react-router-dom";
-import { useAuth } from "../../features/auth/hooks/useAuth";
 import { useMemo } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 
-import { navigationItems } from "./navigation-config";
 import { ROUTES } from "../../constants/routes";
+import { useAuth } from "../../features/auth/hooks/useAuth";
+import { useUnreadNotificationCount } from "../../features/notifications/hooks/useUnreadNotificationCount";
+import { navigationItems } from "./navigation-config";
 
 export function AppSidebar() {
-
   const location = useLocation();
-  
   const { user } = useAuth();
+
+  const { unreadCount } = useUnreadNotificationCount();
 
   const visibleNavigationItems = useMemo(() => {
     if (!user) {
@@ -57,6 +58,8 @@ export function AppSidebar() {
           {visibleNavigationItems.map((item) => {
             const Icon = item.icon;
             const isActive = isNavigationItemActive(item.to);
+            const isNotificationsItem =
+              item.to === ROUTES.app.notifications;
 
             return (
               <NavLink
@@ -85,9 +88,20 @@ export function AppSidebar() {
                   />
                 </span>
 
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium">
-                    {item.label}
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="block text-sm font-medium">
+                      {item.label}
+                    </span>
+
+                    {isNotificationsItem && unreadCount > 0 ? (
+                      <span
+                        aria-label={`${unreadCount} unread notifications`}
+                        className="inline-flex min-w-5 items-center justify-center rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-indigo-300"
+                      >
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    ) : null}
                   </span>
 
                   <span

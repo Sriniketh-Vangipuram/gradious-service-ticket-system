@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 
+import type { AuthUser } from "../../auth/types/auth.types";
 import { useCreateTicketComment } from "../hooks/useCreateTicketComment";
 import { useTicketComments } from "../hooks/useTicketComments";
 import type { CreateTicketCommentFormValues } from "../schemas/comment.schema";
@@ -9,17 +11,24 @@ import { CommentList } from "./CommentList";
 
 interface TicketCommentsProps {
   ticketId: number;
+  currentUser: AuthUser | null;
   canRespond: boolean;
-  isResponseRequired:boolean;
+  isResponseRequired: boolean;
 }
 
 export function TicketComments({
   ticketId,
+  currentUser,
   canRespond,
   isResponseRequired,
 }: TicketCommentsProps) {
   const commentsQuery = useTicketComments(ticketId);
   const createCommentMutation = useCreateTicketComment();
+
+  const [commentVisibility, setCommentVisibility] =
+    useState<"PUBLIC" | "INTERNAL">("PUBLIC");
+
+  const isTechnician = currentUser?.role === "TECHNICIAN";
 
   const handleSubmit = async (
     values: CreateTicketCommentFormValues,
@@ -29,13 +38,28 @@ export function TicketComments({
         ticketId,
         payload: {
           content: values.content,
-          visibility: "PUBLIC",
+          visibility: isTechnician
+            ? commentVisibility
+            : "PUBLIC",
         },
       });
 
-      toast.success("Reply sent");
+      toast.success(
+        commentVisibility === "INTERNAL"
+          ? "Internal note added"
+          : "Reply sent",
+      );
+
+      if (isTechnician) {
+        setCommentVisibility("PUBLIC");
+      }
     } catch {
-      toast.error("Unable to send your reply. Please try again.");
+      toast.error(
+        commentVisibility === "INTERNAL"
+          ? "Unable to add the internal note. Please try again."
+          : "Unable to send your reply. Please try again.",
+      );
+
       throw new Error("Comment submission failed.");
     }
   };
@@ -80,18 +104,54 @@ export function TicketComments({
 
       {canRespond ? (
         <div className="border-t border-slate-800/80 p-3 sm:p-4">
-            {isResponseRequired ? (
+          {isResponseRequired ? (
             <p className="mb-3 text-xs font-medium text-amber-300">
-                Please provide the information requested by the service desk.
+              Please provide the information requested by the
+              service desk.
             </p>
-            ) : null}
+          ) : null}
 
-            <CommentComposer
+          {isTechnician ? (
+            <div className="mb-3 flex w-fit rounded-lg border border-slate-800 bg-slate-900 p-1">
+              <button
+                type="button"
+                onClick={() => setCommentVisibility("PUBLIC")}
+                disabled={createCommentMutation.isPending}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                  commentVisibility === "PUBLIC"
+                    ? "bg-indigo-500 text-white"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                Public reply
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCommentVisibility("INTERNAL")}
+                disabled={createCommentMutation.isPending}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                  commentVisibility === "INTERNAL"
+                    ? "bg-amber-500 text-slate-950"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                Internal note
+              </button>
+            </div>
+          ) : null}
+
+          <CommentComposer
             onSubmit={handleSubmit}
+            visibility={
+              isTechnician
+                ? commentVisibility
+                : "PUBLIC"
+            }
             isSubmitting={createCommentMutation.isPending}
-            />
+          />
         </div>
-        ) : null}
+      ) : null}
     </section>
   );
 }
