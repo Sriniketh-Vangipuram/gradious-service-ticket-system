@@ -15,7 +15,7 @@ const sharedCookieOptions:CookieOptions={
 
 export const accessCookieOptions:CookieOptions={
     ...sharedCookieOptions,
-    path:"/api/v1",
+    path:"/",
     maxAge:15 * 60 * 1000
 };
 
