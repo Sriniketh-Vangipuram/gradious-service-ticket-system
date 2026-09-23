@@ -67,6 +67,7 @@ export async function assignTicketUseCase(
       where: buildTicketAssignmentScope(ticketId, actor),
       select: {
         id: true,
+        ticketNumber:true,
         centerId: true,
         requesterId:true,
         assigneeId: true,
@@ -163,23 +164,58 @@ export async function assignTicketUseCase(
       recipientIds.push(ticket.assigneeId);
     }
 
-    const isUnassigned = newAssigneeId === null;
-
-    createdNotifications =await createNotifications(tx, {
-      recipientIds,
+    // Notify the requester with requester-specific messaging.
+    const requesterNotifications = await createNotifications(tx, {
+      recipientIds: [ticket.requesterId],
       type: NotificationType.TICKET_ASSIGNED,
-      title: isUnassigned
-        ? "Ticket unassigned"
-        : ticket.assigneeId === null
-          ? "Ticket assigned to you"
-          : "Ticket reassigned",
-      message: isUnassigned
-        ? `Ticket #${ticket.id} has been unassigned.`
-        : `Ticket #${ticket.id} has been ${
-            ticket.assigneeId === null ? "assigned" : "reassigned"
-          }.`,
+      title:
+        event === AssignmentEvent.UNASSIGNED
+          ? "Ticket unassigned"
+          : event === AssignmentEvent.REASSIGNED
+            ? "Ticket reassigned"
+            : "Ticket assigned",
+      message:
+        event === AssignmentEvent.UNASSIGNED
+          ? `Your ticket ${ticket.ticketNumber} is currently unassigned.`
+          : event === AssignmentEvent.REASSIGNED
+            ? `Your ticket ${ticket.ticketNumber} has been reassigned.`
+            : `Your ticket ${ticket.ticketNumber} has been assigned to a technician.`,
       ticketId: ticket.id,
     });
+
+    // Notify the technician with technician-specific messaging.
+    let technicianNotifications: Awaited<
+      ReturnType<typeof createNotifications>
+    > = [];
+
+    if (newAssigneeId !== null) {
+      technicianNotifications = await createNotifications(tx, {
+        recipientIds: [newAssigneeId],
+        type: NotificationType.TICKET_ASSIGNED,
+        title:
+          event === AssignmentEvent.REASSIGNED
+            ? "Ticket reassigned to you"
+            : "Ticket assigned to you",
+        message:
+          event === AssignmentEvent.REASSIGNED
+            ? `Ticket ${ticket.ticketNumber} has been reassigned to you.`
+            : `Ticket ${ticket.ticketNumber} has been assigned to you.`,
+        ticketId: ticket.id,
+      });
+    } else if (ticket.assigneeId !== null) {
+      technicianNotifications = await createNotifications(tx, {
+        recipientIds: [ticket.assigneeId],
+        type: NotificationType.TICKET_ASSIGNED,
+        title: "Ticket unassigned",
+        message: `Ticket ${ticket.ticketNumber} is no longer assigned to you.`,
+        ticketId: ticket.id,
+      });
+    }
+
+    createdNotifications = [
+      ...requesterNotifications,
+      ...technicianNotifications,
+    ];
 
     // 7. Return the updated ticket with safe related data.
     return {
