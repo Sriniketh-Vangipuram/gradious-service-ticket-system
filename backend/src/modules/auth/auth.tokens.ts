@@ -2,6 +2,7 @@ import { randomBytes,createHash } from "node:crypto";
 
 import { SignJWT,jwtVerify } from "jose";
 import {env} from "../../config/env";
+import { UserRole } from "../../generated/prisma/enums";
 
 const accessTokenSecret=new TextEncoder().encode(
     env.JWT_ACCESS_SECRET
@@ -9,7 +10,7 @@ const accessTokenSecret=new TextEncoder().encode(
 
 export interface AccessTokenPayload{
     userId:number;
-    role:string;
+    role:UserRole;
 }
 
 // create a short-lived access JWT
@@ -46,7 +47,7 @@ export async function verifyAccessToken(token:string){
 
     return {
         userId,
-        role:payload.role
+        role:payload.role as UserRole
     };
 }
 

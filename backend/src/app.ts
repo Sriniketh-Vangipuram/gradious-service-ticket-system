@@ -11,6 +11,7 @@ import { errorMiddleware } from "./common/errors/error.middleware";
 import ticketRouter from "./modules/tickets/ticket.routes";
 import notificationRoutes from "./modules/notifications/notification.routes";
 import catalogRouter from "./modules/catalog/catalog.routes";
+import userRouter from "./modules/users/user.routes";
 import { env } from "./config/env";
 import crypto from "node:crypto";
 
@@ -49,6 +50,6 @@ app.use("/api/v1/auth",authRouter);
 app.use("/api/v1/tickets", ticketRouter);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/catalog", catalogRouter);
-
+app.use("/api/v1/users",userRouter);
 // Must be registered after routes.
 app.use(errorMiddleware);
