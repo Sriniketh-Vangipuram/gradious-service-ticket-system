@@ -1,4 +1,4 @@
-import { UserRole } from "../../generated/prisma/client";
+import { UserRole, TechnicianSpecialization } from "../../generated/prisma/client";
 import { prisma } from "../../config/database";
 
 import {
@@ -7,6 +7,9 @@ import {
 } from "./policies/user-management.policy";
 
 import type { ListUsersQuery } from "./user.schemas";
+import  { AppError } from "../../common/errors/app-error";
+
+
 
 export async function listUsersUseCase(
   query: ListUsersQuery,
@@ -185,5 +188,142 @@ export async function listUsersUseCase(
       hasNextPage,
       nextCursor,
     },
+  };
+}
+
+export async function updateUserSpecializationsUseCase(
+  userId: number,
+  specializations: TechnicianSpecialization[],
+  actor: UserManagementActor,
+) {
+  /*
+   * Only ADMIN and CENTER_MANAGER are allowed to reach this use case.
+   *
+   * The route already enforces the role, but we still keep the
+   * domain authorization here because authorization must not depend
+   * solely on HTTP routing.
+   */
+  if (
+    actor.role !== UserRole.ADMIN &&
+    actor.role !== UserRole.CENTER_MANAGER
+  ) {
+    throw new AppError(
+      "FORBIDDEN",
+      "You are not allowed to manage user specializations.",
+    );
+  }
+
+  /*
+   * Load the target technician.
+   *
+   * We need:
+   * - role → ensure this is actually a technician
+   * - centerAccess → determine manager authorization scope
+   */
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+    select: {
+      id: true,
+      role: true,
+
+      centerAccess: {
+        select: {
+          centerId: true,
+        },
+      },
+    },
+  });
+
+  if (!user) {
+    throw new AppError(
+      "NOT_FOUND",
+      "User was not found.",
+    );
+  }
+
+  /*
+   * Specializations are meaningful only for technicians.
+   */
+  if (user.role !== UserRole.TECHNICIAN) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Only technicians can have specializations.",
+    );
+  }
+
+  /*
+   * ADMIN:
+   * unrestricted management scope.
+   */
+  if (actor.role === UserRole.ADMIN) {
+    await prisma.$transaction(async (tx) => {
+      await tx.userSpecialization.deleteMany({
+        where: {
+          userId,
+        },
+      });
+
+      if (specializations.length > 0) {
+        await tx.userSpecialization.createMany({
+          data: specializations.map((specialization) => ({
+            userId,
+            specialization,
+          })),
+        });
+      }
+    });
+  }
+
+  /*
+   * CENTER_MANAGER:
+   *
+   * The technician must belong to at least one center
+   * that the manager has access to.
+   */
+  if (actor.role === UserRole.CENTER_MANAGER) {
+    const managerAccess = await prisma.userCenter.findFirst({
+      where: {
+        userId: actor.userId,
+        centerId: {
+          in: user.centerAccess.map(
+            (access) => access.centerId,
+          ),
+        },
+      },
+      select: {
+        centerId: true,
+      },
+    });
+
+    if (!managerAccess) {
+      throw new AppError(
+        "FORBIDDEN",
+        "You do not have access to manage this technician.",
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.userSpecialization.deleteMany({
+        where: {
+          userId,
+        },
+      });
+
+      if (specializations.length > 0) {
+        await tx.userSpecialization.createMany({
+          data: specializations.map((specialization) => ({
+            userId,
+            specialization,
+          })),
+        });
+      }
+    });
+  }
+
+  return {
+    userId,
+    specializations,
   };
 }

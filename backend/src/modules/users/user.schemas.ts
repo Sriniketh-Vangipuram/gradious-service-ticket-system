@@ -12,7 +12,7 @@ export const listUsersQuerySchema = z.object({
     .max(100, "Search must be at most 100 characters.")
     .optional(),
 
-  role: z.nativeEnum(UserRole).optional(),
+  role: z.enum(UserRole).optional(),
 
   centerId: z.coerce
     .number()
@@ -27,7 +27,7 @@ export const listUsersQuerySchema = z.object({
     .optional(),
 
   specialization: z
-    .nativeEnum(TechnicianSpecialization)
+    .enum(TechnicianSpecialization)
     .optional(),
 
   isActive: z
@@ -50,3 +50,21 @@ export const listUsersQuerySchema = z.object({
 });
 
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
+
+export const userIdParamsSchema = z.object({
+  userId: z.coerce
+    .number()
+    .int("User ID must be an integer.")
+    .positive("User ID must be greater than zero."),
+});
+
+export const updateUserSpecializationsBodySchema = z.object({
+  specializations: z
+    .array(z.nativeEnum(TechnicianSpecialization))
+    .max(3, "A technician can have at most 3 specializations.")
+    .refine(
+      (values) => new Set(values).size === values.length,
+      "Duplicate specializations are not allowed.",
+    ),
+});
+

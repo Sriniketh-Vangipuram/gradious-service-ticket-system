@@ -39,18 +39,19 @@ model User {
   notifications        Notification[]
   auditLogs            AuditLog[]          @relation("AuditLogActor")
   refreshSessions      RefreshSession[]
-  idempotencyRecords IdempotencyRecord[]
+  idempotencyRecords   IdempotencyRecord[]
 
   // Optional primary/home center
-  centerId             Int?
-  center               Center?             @relation("UserPrimaryCenter", fields: [centerId], references: [id], onDelete: SetNull)
+  centerId Int?
+  center   Center? @relation("UserPrimaryCenter", fields: [centerId], references: [id], onDelete: SetNull)
 
   labId Int?
   lab   Lab? @relation("UserAssignedLab", fields: [labId], references: [id], onDelete: SetNull)
 
+  specializations UserSpecialization[]
 
   // Centers this user is authorized to access
-  centerAccess UserCenter[]
+  centerAccess            UserCenter[]
   notificationPreferences NotificationPreference[]
 
   createdAt DateTime @default(now())
@@ -121,7 +122,7 @@ model Lab {
   assignedUsers User[] @relation("UserAssignedLab")
 
   centerId Int
-  center Center @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  center   Center @relation(fields: [centerId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -229,7 +230,7 @@ model Ticket {
   firstResponseTargetMinutes Int?
   resolutionTargetMinutes    Int?
   slaCycles                  TicketSlaCycle[]
-  atRiskThresholdPercent Int @default(75)
+  atRiskThresholdPercent     Int              @default(75)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -345,7 +346,7 @@ model NotificationPreference {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, type])
   @@index([userId])
@@ -377,8 +378,8 @@ model Notification {
   userId Int
   user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
-  ticketId Int?
-  ticket   Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  ticketId  Int?
+  ticket    Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
   dedupeKey String? @unique @db.VarChar(191)
 
   createdAt DateTime @default(now())
@@ -417,9 +418,9 @@ model TicketSlaCycle {
   resolvedAt DateTime?
   outcome    SlaCycleOutcome?
 
-  ticketId Int
-  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
-  atRiskThresholdPercent Int @default(75)
+  ticketId               Int
+  ticket                 Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  atRiskThresholdPercent Int    @default(75)
 
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
@@ -485,10 +486,10 @@ model TicketNumberCounter {
 }
 
 model IdempotencyRecord {
-  id             Int      @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  userId         Int
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   key            String   @db.VarChar(128)
   requestHash    String   @db.Char(64)
@@ -499,4 +500,21 @@ model IdempotencyRecord {
 
   @@unique([userId, key])
   @@index([expiresAt])
+}
+
+enum TechnicianSpecialization {
+  SOFTWARE
+  HARDWARE
+  NETWORK
+}
+
+model UserSpecialization {
+  userId         Int
+  specialization TechnicianSpecialization
+  createdAt      DateTime                 @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, specialization])
+  @@index([specialization, userId])
 }
