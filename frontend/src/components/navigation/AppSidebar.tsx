@@ -1,12 +1,14 @@
-import { NavLink } from "react-router-dom";
-
+import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../features/auth/hooks/useAuth";
 import { useMemo } from "react";
 
 import { navigationItems } from "./navigation-config";
-
+import { ROUTES } from "../../constants/routes";
 
 export function AppSidebar() {
+
+  const location = useLocation();
+  
   const { user } = useAuth();
 
   const visibleNavigationItems = useMemo(() => {
@@ -18,6 +20,18 @@ export function AppSidebar() {
       item.roles.includes(user.role),
     );
   }, [user]);
+
+  const isNavigationItemActive = (itemTo: string) => {
+    if (itemTo === ROUTES.app.tickets) {
+      return (
+        location.pathname === ROUTES.app.tickets ||
+        (location.pathname.startsWith(`${ROUTES.app.tickets}/`) &&
+          location.pathname !== ROUTES.app.createTicket)
+      );
+    }
+
+    return location.pathname === itemTo;
+  };
 
   return (
     <aside
@@ -42,56 +56,51 @@ export function AppSidebar() {
         <nav className="flex-1 space-y-1 px-3 py-5">
           {visibleNavigationItems.map((item) => {
             const Icon = item.icon;
+            const isActive = isNavigationItemActive(item.to);
 
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={({ isActive }) =>
-                  [
-                    "group flex items-center gap-3 rounded-xl px-3 py-3 transition",
-                    "focus:outline-none focus:ring-2 focus:ring-indigo-400/70",
-                    isActive
-                      ? "bg-indigo-500/10 text-white ring-1 ring-inset ring-indigo-500/20"
-                      : "text-slate-400 hover:bg-slate-900 hover:text-slate-100",
-                  ].join(" ")
-                }
+                className={[
+                  "group flex items-center gap-3 rounded-xl px-3 py-3 transition",
+                  "focus:outline-none focus:ring-2 focus:ring-indigo-400/70",
+                  isActive
+                    ? "bg-indigo-500/10 text-white ring-1 ring-inset ring-indigo-500/20"
+                    : "text-slate-400 hover:bg-slate-900 hover:text-slate-100",
+                ].join(" ")}
               >
-                {({ isActive }) => (
-                  <>
-                    <span
-                      className={[
-                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition",
-                        isActive
-                          ? "bg-indigo-500/15 text-indigo-300"
-                          : "bg-slate-900 text-slate-500 group-hover:text-slate-300",
-                      ].join(" ")}
-                    >
-                      <Icon
-                        size={17}
-                        strokeWidth={1.8}
-                        aria-hidden="true"
-                      />
-                    </span>
+                <span
+                  className={[
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition",
+                    isActive
+                      ? "bg-indigo-500/15 text-indigo-300"
+                      : "bg-slate-900 text-slate-500 group-hover:text-slate-300",
+                  ].join(" ")}
+                >
+                  <Icon
+                    size={17}
+                    strokeWidth={1.8}
+                    aria-hidden="true"
+                  />
+                </span>
 
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium">
-                        {item.label}
-                      </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium">
+                    {item.label}
+                  </span>
 
-                      <span
-                        className={[
-                          "mt-0.5 block truncate text-xs",
-                          isActive
-                            ? "text-slate-400"
-                            : "text-slate-600 group-hover:text-slate-500",
-                        ].join(" ")}
-                      >
-                        {item.description}
-                      </span>
-                    </span>
-                  </>
-                )}
+                  <span
+                    className={[
+                      "mt-0.5 block truncate text-xs",
+                      isActive
+                        ? "text-slate-400"
+                        : "text-slate-600 group-hover:text-slate-500",
+                    ].join(" ")}
+                  >
+                    {item.description}
+                  </span>
+                </span>
               </NavLink>
             );
           })}

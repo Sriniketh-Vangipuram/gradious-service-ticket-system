@@ -10,6 +10,7 @@ export interface AuthUser {
     email:string;
     role:UserRole;
     centerId:number | null;
+    labId:number | null;
 }
 
 export interface CurrentUser extends AuthUser{

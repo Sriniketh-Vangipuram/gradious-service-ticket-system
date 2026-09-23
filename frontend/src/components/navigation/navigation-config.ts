@@ -40,7 +40,7 @@ export const navigationItems: NavigationItem[] = [
   {
     label: "Create Ticket",
     description: "Submit a new request",
-    to: ROUTES.app.tickets,
+    to: ROUTES.app.createTicket,
     icon: PlusCircle,
     roles: ["EMPLOYEE"],
   },

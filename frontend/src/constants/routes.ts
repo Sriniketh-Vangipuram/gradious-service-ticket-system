@@ -5,6 +5,7 @@ export const ROUTES = {
   app: {
     dashboard: "/dashboard",
     tickets: "/tickets",
+    createTicket:"/tickets/new",
     ticket: (ticketId: number | string) => `/tickets/${ticketId}`,
     notifications: "/notifications",
   },

@@ -6,11 +6,10 @@ import { PublicLayout } from "../layouts/PublicLayout";
 import { AuthenticatedLayout } from "../layouts/AuthenticatedLayout";
 import { LoginPage } from "../../features/auth/pages/LoginPage";
 import { RegisterPage } from "../../features/auth/pages/RegisterPage";
+import { TicketsPage } from "../../features/tickets/pages/TicketsPage";
+import { DashboardPage } from "../../features/dashboard/pages/DashboardPage";
+import { CreateTicketPage } from "../../features/tickets/pages/CreateTicketPage";
 
-
-function DashboardPlaceholder() {
-  return <div className="p-8">Dashboard</div>;
-}
 
 function NotFoundPlaceholder() {
   return <div className="p-8">Page not found</div>;
@@ -36,7 +35,14 @@ export function AppRouter() {
       >
         <Route
           path={ROUTES.app.dashboard}
-          element={<DashboardPlaceholder />}
+          element={< DashboardPage/>}
+        />
+
+        <Route path={ROUTES.app.createTicket} element={<CreateTicketPage />} />
+
+        <Route
+          path={ROUTES.app.tickets}
+          element={<TicketsPage/>}
         />
       </Route>
 
