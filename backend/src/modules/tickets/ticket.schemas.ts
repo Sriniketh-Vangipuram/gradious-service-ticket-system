@@ -29,9 +29,9 @@ export const createTicketSchema = z
 
     softwareId: z.number().int().positive().optional(),
 
-    centerId: z.number().int().positive(),
+    centerId: z.number().int().positive().optional(),
 
-    labId: z.number().int().positive(),
+    labId: z.number().int().positive().optional(),
 
     priority: z.enum(ticketPriorityValues),
 

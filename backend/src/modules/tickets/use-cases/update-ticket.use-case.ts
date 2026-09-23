@@ -52,8 +52,6 @@ const employeeEditableFields = new Set([
   "categoryId",
   "softwareId",
   "requestType",
-  "centerId",
-  "labId",
 ]);
 
 const technicianEditableFields = new Set([

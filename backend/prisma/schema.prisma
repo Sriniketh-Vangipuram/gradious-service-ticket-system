@@ -45,6 +45,10 @@ model User {
   centerId             Int?
   center               Center?             @relation("UserPrimaryCenter", fields: [centerId], references: [id], onDelete: SetNull)
 
+  labId Int?
+  lab   Lab? @relation("UserAssignedLab", fields: [labId], references: [id], onDelete: SetNull)
+
+
   // Centers this user is authorized to access
   centerAccess UserCenter[]
   notificationPreferences NotificationPreference[]
@@ -113,8 +117,11 @@ model Lab {
 
   tickets Ticket[]
 
+  // Users assigned to this lab
+  assignedUsers User[] @relation("UserAssignedLab")
+
   centerId Int
-  center   Center @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  center Center @relation(fields: [centerId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

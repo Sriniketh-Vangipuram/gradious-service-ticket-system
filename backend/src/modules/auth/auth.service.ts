@@ -48,7 +48,8 @@ export async function register(input:RegisterInput){
         fullName:true,
         email:true,
         role:true,
-        centerId:true
+        centerId:true,
+        labId:true,
       }
     });
 
@@ -130,6 +131,7 @@ export async function login(
             email:user.email,
             role:user.role,
             centerId:user.centerId,
+            labId:user.labId,
 
         }
     };
@@ -151,6 +153,7 @@ type RefreshResult =
         email: string;
         role: string;
         centerId: number | null;
+        labId: number | null;
       };
     }
   | {
@@ -295,7 +298,8 @@ export async function refreshSession(
         fullName: session.user.fullName,
         email: session.user.email,
         role: session.user.role,
-        centerId: session.user.centerId
+        centerId: session.user.centerId,
+        labId: session.user.labId,
       }
     };
   });
@@ -338,6 +342,7 @@ export async function getCurrentUser(userId: number) {
       email: true,
       role: true,
       centerId: true,
+      labId:true,
       isActive: true
     }
   });
