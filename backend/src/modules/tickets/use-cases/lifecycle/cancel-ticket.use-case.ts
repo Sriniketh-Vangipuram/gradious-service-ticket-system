@@ -61,6 +61,7 @@ export async function cancelTicketUseCase(
       where: scope,
       select: {
         id: true,
+        ticketNumber:true,
         status: true,
         requesterId: true,
         assigneeId: true,
@@ -123,20 +124,40 @@ export async function cancelTicketUseCase(
       },
     });
 
-    // Notify the requester and assigned technician about cancellation.
+    // Notify the requester and assigned technician with
+    // recipient-specific cancellation messaging.
     const recipientIds: number[] = [ticket.requesterId];
 
     if (ticket.assigneeId !== null) {
       recipientIds.push(ticket.assigneeId);
     }
 
-    createdNotifications = await createNotifications(tx, {
-      recipientIds,
+    const requesterNotifications = await createNotifications(tx, {
+      recipientIds: [ticket.requesterId],
       type: NotificationType.TICKET_STATUS_CHANGED,
       title: "Ticket cancelled",
-      message: `Ticket #${ticket.id} has been cancelled.`,
+      message: `Your ticket ${ticket.ticketNumber} has been cancelled.`,
       ticketId: ticket.id,
     });
+
+    let technicianNotifications: Awaited<
+      ReturnType<typeof createNotifications>
+    > = [];
+
+    if (ticket.assigneeId !== null) {
+      technicianNotifications = await createNotifications(tx, {
+        recipientIds: [ticket.assigneeId],
+        type: NotificationType.TICKET_STATUS_CHANGED,
+        title: "Assigned ticket cancelled",
+        message: `Ticket ${ticket.ticketNumber} has been cancelled.`,
+        ticketId: ticket.id,
+      });
+    }
+
+    createdNotifications = [
+      ...requesterNotifications,
+      ...technicianNotifications,
+    ];
 
     return {
       ticket: await tx.ticket.findUniqueOrThrow({

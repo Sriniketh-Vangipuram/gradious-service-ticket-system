@@ -70,6 +70,7 @@ export async function confirmTicketClosureUseCase(
       where: scope,
       select: {
         id: true,
+        ticketNumber:true,
         status: true,
         requesterId: true,
         assigneeId: true,
@@ -132,8 +133,7 @@ export async function confirmTicketClosureUseCase(
         recipientIds: [ticket.assigneeId],
         type: NotificationType.TICKET_STATUS_CHANGED,
         title: "Ticket closed",
-        message: `Ticket #${ticket.id} was closed by the requester.`,
-        ticketId: ticket.id,
+        message: `Ticket ${ticket.ticketNumber} was closed by the requester.`,        ticketId: ticket.id,
       });
     }
 

@@ -56,6 +56,7 @@ export async function reopenTicketUseCase(
       where: scope,
       select: {
         id: true,
+        ticketNumber:true,
         status: true,
         requesterId: true,
         assigneeId: true,
@@ -165,20 +166,40 @@ export async function reopenTicketUseCase(
       },
     });
 
-    // Notify the requester and assigned technician about reopening.
+    // Notify the requester and assigned technician with
+    // recipient-specific messaging.
     const recipientIds: number[] = [ticket.requesterId];
 
     if (ticket.assigneeId !== null) {
       recipientIds.push(ticket.assigneeId);
     }
 
-    createdNotifications = await createNotifications(tx, {
-      recipientIds,
+    const requesterNotifications = await createNotifications(tx, {
+      recipientIds: [ticket.requesterId],
       type: NotificationType.TICKET_REOPENED,
       title: "Ticket reopened",
-      message: `Ticket #${ticket.id} has been reopened and moved to IN_PROGRESS.`,
+      message: `Your ticket ${ticket.ticketNumber} has been reopened and moved to IN_PROGRESS.`,
       ticketId: ticket.id,
     });
+
+    let technicianNotifications: Awaited<
+      ReturnType<typeof createNotifications>
+    > = [];
+
+    if (ticket.assigneeId !== null) {
+      technicianNotifications = await createNotifications(tx, {
+        recipientIds: [ticket.assigneeId],
+        type: NotificationType.TICKET_REOPENED,
+        title: "Assigned ticket reopened",
+        message: `Ticket ${ticket.ticketNumber} has been reopened and moved to IN_PROGRESS.`,
+        ticketId: ticket.id,
+      });
+    }
+
+    createdNotifications = [
+      ...requesterNotifications,
+      ...technicianNotifications,
+    ];
 
     return {
       ticket: await tx.ticket.findUniqueOrThrow({

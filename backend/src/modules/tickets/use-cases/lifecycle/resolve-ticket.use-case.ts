@@ -69,6 +69,7 @@ export async function resolveTicketUseCase(
       where: scope,
       select: {
         id: true,
+        ticketNumber:true,
         status: true,
         requesterId: true,
         assigneeId: true,
@@ -209,7 +210,7 @@ export async function resolveTicketUseCase(
       recipientIds: [ticket.requesterId],
       type: NotificationType.TICKET_RESOLVED,
       title: "Ticket resolved",
-      message: `Ticket #${ticket.id} has been resolved. Please review the resolution and confirm closure when ready.`,
+      message: `Ticket ${ticket.ticketNumber} has been resolved. Please review the resolution and confirm closure when ready.`,
       ticketId: ticket.id,
     });
 
