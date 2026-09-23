@@ -117,6 +117,7 @@ export async function changeTicketStatusUseCase(
       where: scope,
       select: {
         id: true,
+        ticketNumber:true,
         status: true,
         requesterId: true,
         assigneeId: true,
@@ -242,20 +243,34 @@ export async function changeTicketStatusUseCase(
       },
     });
 
-    // 7. Notify the requester and assigned technician about the status change.
-    const recipientIds: number[] = [ticket.requesterId];
-
-    if (ticket.assigneeId !== null) {
-      recipientIds.push(ticket.assigneeId);
-    }
-
-    createdNotifications = await createNotifications(tx, {
-      recipientIds,
+    // 7. Notify the requester and assigned technician with
+    // recipient-specific messaging.
+    const requesterNotifications = await createNotifications(tx, {
+      recipientIds: [ticket.requesterId],
       type: NotificationType.TICKET_STATUS_CHANGED,
       title: "Ticket status updated",
-      message: `Ticket #${ticket.id} status changed from ${ticket.status} to ${nextStatus}.`,
+      message: `Your ticket ${ticket.ticketNumber} status changed from ${ticket.status} to ${nextStatus}.`,
       ticketId: ticket.id,
     });
+
+    let technicianNotifications: Awaited<
+      ReturnType<typeof createNotifications>
+    > = [];
+
+    if (ticket.assigneeId !== null) {
+      technicianNotifications = await createNotifications(tx, {
+        recipientIds: [ticket.assigneeId],
+        type: NotificationType.TICKET_STATUS_CHANGED,
+        title: "Assigned ticket status updated",
+        message: `Ticket ${ticket.ticketNumber} status changed from ${ticket.status} to ${nextStatus}.`,
+        ticketId: ticket.id,
+      });
+    }
+
+    createdNotifications = [
+      ...requesterNotifications,
+      ...technicianNotifications,
+    ];
 
     // 8. Return the updated ticket with safe related data.
     return {
