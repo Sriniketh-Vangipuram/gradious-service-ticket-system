@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   PlusCircle,
   ListTodo,
+  Settings2,
   Ticket,
   type LucideIcon,
 } from "lucide-react";
@@ -55,6 +56,14 @@ export const navigationItems: NavigationItem[] = [
     icon: ClipboardList,
     roles: ["TECHNICIAN"],
   },
+  {
+  label: "Administration",
+  description: "Manage service operations",
+  to: ROUTES.administration.dashboard,
+  icon: Settings2,
+  roles: ["CENTER_MANAGER", "ADMIN"],
+},
+
   {
     label: "Notifications",
     description: "Updates and alerts",

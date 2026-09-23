@@ -15,7 +15,7 @@ export const ROUTES = {
     queue: "/technician/queue",
   },
 
-  management: {
+  administration: {
     dashboard: "/management/dashboard",
     users: "/management/users",
     centers: "/management/centers",

@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Outlet, Route, Routes } from "react-router-dom";
 
 import { ROUTES } from "../../constants/routes";
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -13,6 +13,10 @@ import { TicketDetailsPage } from "../../features/tickets/pages/TicketDetailsPag
 import { NotificationsPage } from "../../features/notifications/pages/NotificationsPage";
 import { TechnicianDashboardPage } from "../../features/technician/pages/TechnicianDashboardPage";
 import { TechnicianQueuePage } from "../../features/technician/pages/TechnicianQueuePage";
+import { AdministrationDashboardPage } from "../../features/administration/dashboard/pages/AdministrationDashboardPage";
+import { AdministrationTicketsPage } from "../../features/administration/tickets/pages/AdministrationTicketsPage";
+import AdministrationUsersPage from "../../features/administration/users/pages/AdministrationUsersPage";
+
 
 function NotFoundPlaceholder() {
   return <div className="p-8">Page not found</div>;
@@ -67,6 +71,32 @@ export function AppRouter() {
           path={ROUTES.technician.queue}
           element={<TechnicianQueuePage />}
         />
+
+       <Route
+        element={
+          <ProtectedRoute
+            allowedRoles={["CENTER_MANAGER", "ADMIN"]}
+          >
+            <Outlet />
+          </ProtectedRoute>
+        }
+      >
+        <Route
+          path={ROUTES.administration.dashboard}
+          element={<AdministrationDashboardPage />}
+        />
+
+        <Route
+          path={ROUTES.administration.tickets}
+          element={<AdministrationTicketsPage />}
+        />
+
+        <Route
+          path={ROUTES.administration.users}
+          element={<AdministrationUsersPage />}
+        />
+        
+      </Route>
       </Route>
 
       <Route

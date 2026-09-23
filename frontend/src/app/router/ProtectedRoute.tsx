@@ -4,15 +4,22 @@ import type { PropsWithChildren } from "react";
 import { ROUTES } from "../../constants/routes";
 import { AuthLoadingScreen } from "../../components/feedback/AuthLoadingScreen";
 import { useCurrentUser } from "../../features/auth/hooks/useCurrentUser";
+import type { UserRole } from "../../features/auth/types/auth.types";
+
+interface ProtectedRouteProps extends PropsWithChildren {
+  allowedRoles?: UserRole[];
+}
 
 export function ProtectedRoute({
   children,
-}: PropsWithChildren) {
+  allowedRoles,
+}: ProtectedRouteProps) {
   const {
     isLoading,
     isAuthenticated,
     isUnauthenticated,
     error,
+    user,
   } = useCurrentUser();
 
   // Session is still being restored.
@@ -32,6 +39,18 @@ export function ProtectedRoute({
 
   // A user exists and the session is valid.
   if (isAuthenticated) {
+    if (
+      allowedRoles &&
+      (!user || !allowedRoles.includes(user.role))
+    ) {
+      return (
+        <Navigate
+          to={ROUTES.app.dashboard}
+          replace
+        />
+      );
+    }
+
     return children;
   }
 
