@@ -10,6 +10,8 @@ import { TicketsPage } from "../../features/tickets/pages/TicketsPage";
 import { DashboardPage } from "../../features/dashboard/pages/DashboardPage";
 import { CreateTicketPage } from "../../features/tickets/pages/CreateTicketPage";
 import { TicketDetailsPage } from "../../features/tickets/pages/TicketDetailsPage";
+import { NotificationsPage } from "../../features/notifications/pages/NotificationsPage";
+
 
 function NotFoundPlaceholder() {
   return <div className="p-8">Page not found</div>;
@@ -48,6 +50,11 @@ export function AppRouter() {
         <Route
           path={ROUTES.app.tickets}
           element={<TicketsPage/>}
+        />
+
+        <Route
+          path={ROUTES.app.notifications}
+          element={<NotificationsPage />}
         />
       </Route>
 

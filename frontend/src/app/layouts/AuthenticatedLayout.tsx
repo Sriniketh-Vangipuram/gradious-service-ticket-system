@@ -3,8 +3,22 @@ import { Outlet } from "react-router-dom";
 import { AppSidebar } from "../../components/navigation/AppSidebar";
 import { UserMenu } from "../../components/navigation/UserMenu";
 import { MobileNavigation } from "../../components/navigation/MobileNavigation";
+import { useSocketConnection } from "../../lib/socket/useSocketConnection";
+import { useCurrentUser } from "../../features/auth/hooks/useCurrentUser";
+import { useNotificationSocket } from "../../features/notifications/hooks/useNotificationSocket";
+
 
 export function AuthenticatedLayout() {
+  const { data: currentUser } = useCurrentUser();
+
+  const socketEnabled = Boolean(currentUser);
+
+  useSocketConnection({
+    enabled: socketEnabled,
+  });
+
+  useNotificationSocket(socketEnabled);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur">
