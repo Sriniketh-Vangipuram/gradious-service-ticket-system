@@ -4,9 +4,11 @@ import {
   Clock3,
   FileText,
   MapPin,
+  MessageCircle,
   RefreshCw,
   UserRound,
 } from "lucide-react";
+
 import { Link, useParams } from "react-router-dom";
 
 import { ROUTES } from "../../../constants/routes";
@@ -16,7 +18,7 @@ import { useTicket } from "../hooks/useTickets";
 import { TicketComments } from "../../comments/components/TicketComments";
 import { useCurrentUser } from "../../auth/hooks/useCurrentUser";
 import { canRespondToTicket } from "../ticket.permissions";
-
+import { TicketLifecycleActions } from "../components/TicketLifecycleActions";
 
 function formatDate(dateString: string | null): string {
   if (!dateString) {
@@ -229,6 +231,36 @@ export function TicketDetailsPage() {
           </div>
         </div>
 
+        {ticket.status === "WAITING_FOR_USER" ? (
+            <section
+              aria-labelledby="response-required-heading"
+              className="mt-5 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5 sm:p-6"
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  aria-hidden="true"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-300"
+                >
+                  <MessageCircle size={18} />
+                </div>
+
+                <div className="min-w-0">
+                  <h2
+                    id="response-required-heading"
+                    className="text-sm font-semibold text-amber-200"
+                  >
+                    Your response is required
+                  </h2>
+
+                  <p className="mt-1 text-sm leading-6 text-amber-200/70">
+                    The service desk is waiting for additional information from you.
+                    Reply in the conversation below to continue this request.
+                  </p>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
         <div className="mt-5 grid gap-5 lg:grid-cols-3">
           <article className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5">
             <div className="flex items-center gap-2 text-slate-300">
@@ -407,6 +439,16 @@ export function TicketDetailsPage() {
             </div>
           </dl>
         </article>
+
+        {currentUser ? (
+          <div className="mt-5">
+            <TicketLifecycleActions
+              ticket={ticket}
+              currentUser={currentUser}
+            />
+          </div>
+        ) : null}
+        
         <TicketComments
           ticketId={ticket.id}
           canRespond={
@@ -414,6 +456,7 @@ export function TicketDetailsPage() {
               ? canRespondToTicket(currentUser,ticket)
               : false
           }
+          isResponseRequired={ticket.status==="WAITING_FOR_USER"}
         />
       </div>
     </section>

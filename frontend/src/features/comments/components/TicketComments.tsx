@@ -10,11 +10,13 @@ import { CommentList } from "./CommentList";
 interface TicketCommentsProps {
   ticketId: number;
   canRespond: boolean;
+  isResponseRequired:boolean;
 }
 
 export function TicketComments({
   ticketId,
   canRespond,
+  isResponseRequired,
 }: TicketCommentsProps) {
   const commentsQuery = useTicketComments(ticketId);
   const createCommentMutation = useCreateTicketComment();
@@ -78,12 +80,18 @@ export function TicketComments({
 
       {canRespond ? (
         <div className="border-t border-slate-800/80 p-3 sm:p-4">
-          <CommentComposer
+            {isResponseRequired ? (
+            <p className="mb-3 text-xs font-medium text-amber-300">
+                Please provide the information requested by the service desk.
+            </p>
+            ) : null}
+
+            <CommentComposer
             onSubmit={handleSubmit}
             isSubmitting={createCommentMutation.isPending}
-          />
+            />
         </div>
-      ) : null}
+        ) : null}
     </section>
   );
 }
