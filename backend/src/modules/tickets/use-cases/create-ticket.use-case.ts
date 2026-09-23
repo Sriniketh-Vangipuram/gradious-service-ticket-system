@@ -471,7 +471,6 @@ export async function createTicketUseCase(
               isActive: true,
               role: {
                 in: [
-                  UserRole.TECHNICIAN,
                   UserRole.CENTER_MANAGER,
                   UserRole.ADMIN,
                 ],
