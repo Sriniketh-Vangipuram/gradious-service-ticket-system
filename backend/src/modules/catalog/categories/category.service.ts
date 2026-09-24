@@ -7,6 +7,8 @@ import type {
   UpdateCategoryBody,
   UpdateCategoryStatusBody,
 } from "./category.schema";
+import { createAuditLog } from "../../audit/audit.service";
+
 
 const normalizeCategoryCode = (code: string) => {
   return code.trim().toUpperCase();
@@ -150,6 +152,7 @@ export const getCategoryById = async (
  */
 export const createCategory = async (
   body: CreateCategoryBody,
+  actorId: number,
 ) => {
   const name = body.name.trim();
   const code = normalizeCategoryCode(body.code);
@@ -160,142 +163,217 @@ export const createCategory = async (
       : null;
 
   try {
-    return await prisma.category.create({
-      data: {
-        name,
-        code,
-        description,
-        isActive: true,
-      },
+    return await prisma.$transaction(async (tx) => {
+      const category = await tx.category.create({
+        data: {
+          name,
+          code,
+          description,
+          isActive: true,
+        },
 
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        description: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          description: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      await createAuditLog(
+        {
+          action: "CATEGORY_CREATED",
+          entityType: "CATEGORY",
+          entityId: String(category.id),
+          actorId,
+
+          newValue: {
+            name: category.name,
+            code: category.code,
+            description: category.description,
+            isActive: category.isActive,
+          },
+        },
+        tx,
+      );
+
+      return category;
     });
   } catch (error) {
     handlePrismaUniqueError(error);
   }
 };
 
-/**
- * Update category metadata.
- */
 export const updateCategory = async (
   categoryId: number,
   body: UpdateCategoryBody,
+  actorId: number,
 ) => {
-  const existingCategory =
-    await prisma.category.findUnique({
-      where: {
-        id: categoryId,
-      },
-
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        description: true,
-        isActive: true,
-      },
-    });
-
-  if (!existingCategory) {
-    throw new Error("Category not found.");
-  }
-
-  const data: Prisma.CategoryUpdateInput = {};
-
-  if (body.name !== undefined) {
-    data.name = body.name.trim();
-  }
-
-  if (body.code !== undefined) {
-    data.code = normalizeCategoryCode(body.code);
-  }
-
-  if (body.description !== undefined) {
-    data.description =
-      body.description === null
-        ? null
-        : body.description.trim() || null;
-  }
-
   try {
-    return await prisma.category.update({
-      where: {
-        id: categoryId,
-      },
+    return await prisma.$transaction(async (tx) => {
+      const existingCategory =
+        await tx.category.findUnique({
+          where: {
+            id: categoryId,
+          },
 
-      data,
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            description: true,
+            isActive: true,
+          },
+        });
 
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        description: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      if (!existingCategory) {
+        throw new Error("Category not found.");
+      }
+
+      const data: Prisma.CategoryUpdateInput = {};
+
+      if (body.name !== undefined) {
+        data.name = body.name.trim();
+      }
+
+      if (body.code !== undefined) {
+        data.code = normalizeCategoryCode(body.code);
+      }
+
+      if (body.description !== undefined) {
+        data.description =
+          body.description === null
+            ? null
+            : body.description.trim() || null;
+      }
+
+      const category = await tx.category.update({
+        where: {
+          id: categoryId,
+        },
+
+        data,
+
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          description: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      await createAuditLog(
+        {
+          action: "CATEGORY_UPDATED",
+          entityType: "CATEGORY",
+          entityId: String(category.id),
+          actorId,
+
+          oldValue: {
+            name: existingCategory.name,
+            code: existingCategory.code,
+            description: existingCategory.description,
+            isActive: existingCategory.isActive,
+          },
+
+          newValue: {
+            name: category.name,
+            code: category.code,
+            description: category.description,
+            isActive: category.isActive,
+          },
+        },
+        tx,
+      );
+
+      return category;
     });
   } catch (error) {
     handlePrismaUniqueError(error);
   }
 };
 
-/**
- * Activate / deactivate category.
- */
 export const updateCategoryStatus = async (
   categoryId: number,
   body: UpdateCategoryStatusBody,
+  actorId: number,
 ) => {
-  const existingCategory =
-    await prisma.category.findUnique({
-      where: {
-        id: categoryId,
-      },
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const existingCategory =
+        await tx.category.findUnique({
+          where: {
+            id: categoryId,
+          },
 
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        description: true,
-        isActive: true,
-      },
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            description: true,
+            isActive: true,
+          },
+        });
+
+      if (!existingCategory) {
+        throw new Error("Category not found.");
+      }
+
+      if (existingCategory.isActive === body.isActive) {
+        return existingCategory;
+      }
+
+      const category = await tx.category.update({
+        where: {
+          id: categoryId,
+        },
+
+        data: {
+          isActive: body.isActive,
+        },
+
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          description: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      await createAuditLog(
+        {
+          action: "CATEGORY_UPDATED",
+          entityType: "CATEGORY",
+          entityId: String(category.id),
+          actorId,
+
+          oldValue: {
+            isActive: existingCategory.isActive,
+          },
+
+          newValue: {
+            isActive: category.isActive,
+          },
+
+          metadata: {
+            operation: "STATUS_CHANGE",
+          },
+        },
+        tx,
+      );
+
+      return category;
     });
-
-  if (!existingCategory) {
-    throw new Error("Category not found.");
+  } catch (error) {
+    handlePrismaUniqueError(error);
   }
-
-  if (existingCategory.isActive === body.isActive) {
-    return existingCategory;
-  }
-
-  return prisma.category.update({
-    where: {
-      id: categoryId,
-    },
-
-    data: {
-      isActive: body.isActive,
-    },
-
-    select: {
-      id: true,
-      name: true,
-      code: true,
-      description: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
 };

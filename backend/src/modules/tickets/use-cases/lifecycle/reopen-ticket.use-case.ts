@@ -21,6 +21,8 @@ import {
 } from "../../../../generated/prisma/client";
 import { createNotifications } from "../../../notifications/notification.service";
 import { publishToUser } from "../../../../socket/socket.server";
+import { createAuditLog } from "../../../audit/audit.service";
+
 
 const ticketInclude = {
   requester: {
@@ -62,6 +64,8 @@ export async function reopenTicketUseCase(
         assigneeId: true,
         centerId: true,
         priority:true,
+        resolvedAt:true,
+        closedAt:true,
       },
     });
 
@@ -165,6 +169,36 @@ export async function reopenTicketUseCase(
         description: body.reason,
       },
     });
+
+    await createAuditLog(
+      {
+        action: "TICKET_REOPENED",
+        entityType: "TICKET",
+        entityId: String(ticket.id),
+        actorId: actor.userId,
+        oldValue: {
+          status: TicketStatus.RESOLVED,
+          resolvedAt: ticket.resolvedAt,
+          closedAt:ticket.closedAt,
+        },
+        newValue: {
+          status: TicketStatus.IN_PROGRESS,
+          resolvedAt: null,
+          closedAt: null,
+          resolutionDueAt,
+          resolutionTargetMinutes: slaPolicy.resolutionMinutes,
+        },
+        metadata: {
+          lifecycleAction: "REOPEN",
+          ticketNumber: ticket.ticketNumber,
+          reason: body.reason,
+          newSlaCycleNumber: nextCycleNumber,
+          slaPolicyPriority: ticket.priority,
+          atRiskThresholdPercent: slaPolicy.atRiskThresholdPercent,
+        },
+      },
+      tx,
+    );
 
     // Notify the requester and assigned technician with
     // recipient-specific messaging.

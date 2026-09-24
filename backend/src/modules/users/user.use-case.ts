@@ -10,7 +10,7 @@ import {
 
 import type { ListUsersQuery } from "./user.schemas";
 import  { AppError } from "../../common/errors/app-error";
-
+import { createAuditLog } from "../audit/audit.service";
 
 
 export async function listUsersUseCase(
@@ -546,7 +546,8 @@ export async function updateUserStatusUseCase(
     };
   }
 
-  const updatedUser = await prisma.user.update({
+  const updatedUser = await prisma.$transaction(async (tx) => {
+  const updatedUser = await tx.user.update({
     where: {
       id: userId,
     },
@@ -563,7 +564,39 @@ export async function updateUserStatusUseCase(
     },
   });
 
+  /*
+   * USER_DEACTIVATED specifically represents the
+   * transition from active -> inactive.
+   *
+   * Reactivation is represented as USER_UPDATED because
+   * the current AuditAction enum has no USER_REACTIVATED action.
+   */
+  await createAuditLog(
+    {
+      action: isActive
+        ? "USER_UPDATED"
+        : "USER_DEACTIVATED",
+
+      entityType: "USER",
+      entityId: String(user.id),
+
+      actorId: actor.userId,
+
+      oldValue: {
+        isActive: user.isActive,
+      },
+
+      newValue: {
+        isActive: updatedUser.isActive,
+      },
+    },
+    tx,
+  );
+
   return updatedUser;
+});
+
+return updatedUser;
 }
 
 export async function updateUserRoleUseCase(
@@ -609,40 +642,66 @@ export async function updateUserRoleUseCase(
     };
   }
 
-  const updatedUser = await prisma.$transaction(async (tx) => {
-    /*
-     * Technician-only data must not remain attached
-     * when the user stops being a technician.
-     */
-    if (role !== UserRole.TECHNICIAN) {
-      await tx.userSpecialization.deleteMany({
-        where: {
-          userId,
-        },
-      });
-    }
-
-    return tx.user.update({
+ const updatedUser = await prisma.$transaction(async (tx) => {
+  /*
+   * Technician-only data must not remain attached
+   * when the user stops being a technician.
+   */
+  if (role !== UserRole.TECHNICIAN) {
+    await tx.userSpecialization.deleteMany({
       where: {
-        id: userId,
-      },
-      data: {
-        role,
-      },
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        role: true,
-        isActive: true,
-        updatedAt: true,
+        userId,
       },
     });
+  }
+
+  const updatedUser = await tx.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      role,
+    },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      role: true,
+      isActive: true,
+      updatedAt: true,
+    },
   });
 
-  return updatedUser;
-}
+  await createAuditLog(
+    {
+      action: "ROLE_CHANGED",
 
+      entityType: "USER",
+      entityId: String(userId),
+
+      actorId: actor.userId,
+
+      oldValue: {
+        role: user.role,
+      },
+
+      newValue: {
+        role: updatedUser.role,
+      },
+
+      metadata: {
+        specializationsCleared:
+          role !== UserRole.TECHNICIAN,
+      },
+    },
+    tx,
+  );
+
+  return updatedUser;
+});
+
+return updatedUser;
+}
 
 export async function updateUserCenterAccessUseCase(
   userId: number,
@@ -911,7 +970,26 @@ export async function updateUserProfileUseCase(
   }
 
   try {
-    return await prisma.user.update({
+  return await prisma.$transaction(async (tx) => {
+    const oldUser = await tx.user.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+      },
+    });
+
+    if (!oldUser) {
+      throw new AppError(
+        "NOT_FOUND",
+        "User was not found.",
+      );
+    }
+
+    const updatedUser = await tx.user.update({
       where: {
         id: userId,
       },
@@ -947,17 +1025,42 @@ export async function updateUserProfileUseCase(
         updatedAt: true,
       },
     });
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      throw new AppError(
-        "CONFLICT",
-        "A user with this email address already exists.",
-      );
-    }
 
-    throw error;
+    await createAuditLog(
+      {
+        action: "USER_UPDATED",
+
+        entityType: "USER",
+        entityId: String(userId),
+
+        actorId: actor.userId,
+
+        oldValue: {
+          fullName: oldUser.fullName,
+          email: oldUser.email,
+        },
+
+        newValue: {
+          fullName: updatedUser.fullName,
+          email: updatedUser.email,
+        },
+      },
+      tx,
+    );
+
+    return updatedUser;
+  });
+} catch (error) {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  ) {
+    throw new AppError(
+      "CONFLICT",
+      "A user with this email address already exists.",
+    );
   }
+
+  throw error;
+}
 }

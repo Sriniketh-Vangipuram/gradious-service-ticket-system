@@ -79,7 +79,7 @@ export async function createCenterController(
       "body",
     );
 
-    const center = await createCenter(body);
+    const center = await createCenter(body,req.authUser!.userId);
 
     sendSuccess(
       res,
@@ -118,6 +118,7 @@ export async function updateCenterController(
     const center = await updateCenter(
       centerId,
       body,
+      req.authUser!.userId
     );
 
     sendSuccess(res, {
@@ -153,6 +154,7 @@ export async function updateCenterStatusController(
     const center = await updateCenterStatus(
       centerId,
       body,
+      req.authUser!.userId
     );
 
     sendSuccess(res, {

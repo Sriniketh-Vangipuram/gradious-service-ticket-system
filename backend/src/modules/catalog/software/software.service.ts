@@ -1,6 +1,8 @@
 import { Prisma } from "../../../generated/prisma/client";
 import { prisma } from "../../../config/database";
 
+import { createAuditLog } from "../../audit/audit.service";
+
 import type {
   CreateSoftwareBody,
   ListSoftwareQuery,
@@ -174,6 +176,7 @@ export const getSoftwareById = async (
  */
 export const createSoftware = async (
   body: CreateSoftwareBody,
+  actorId: number,
 ) => {
   const name = body.name.trim();
 
@@ -183,25 +186,47 @@ export const createSoftware = async (
   const version =
     normalizeNullableText(body.version) ?? null;
 
-  return prisma.software.create({
-    data: {
-      name,
-      vendor,
-      version,
-      licenseRequired: body.licenseRequired,
-      isActive: true,
-    },
+  return prisma.$transaction(async (tx) => {
+    const software = await tx.software.create({
+      data: {
+        name,
+        vendor,
+        version,
+        licenseRequired: body.licenseRequired,
+        isActive: true,
+      },
 
-    select: {
-      id: true,
-      name: true,
-      vendor: true,
-      version: true,
-      licenseRequired: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+      select: {
+        id: true,
+        name: true,
+        vendor: true,
+        version: true,
+        licenseRequired: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    await createAuditLog(
+      {
+        action: "SOFTWARE_CREATED",
+        entityType: "SOFTWARE",
+        entityId: String(software.id),
+        actorId,
+
+        newValue: {
+          name: software.name,
+          vendor: software.vendor,
+          version: software.version,
+          licenseRequired: software.licenseRequired,
+          isActive: software.isActive,
+        },
+      },
+      tx,
+    );
+
+    return software;
   });
 };
 
@@ -211,12 +236,53 @@ export const createSoftware = async (
 export const updateSoftware = async (
   softwareId: number,
   body: UpdateSoftwareBody,
+  actorId: number,
 ) => {
-  const existingSoftware =
-    await prisma.software.findUnique({
+  return prisma.$transaction(async (tx) => {
+    const existingSoftware =
+      await tx.software.findUnique({
+        where: {
+          id: softwareId,
+        },
+
+        select: {
+          id: true,
+          name: true,
+          vendor: true,
+          version: true,
+          licenseRequired: true,
+          isActive: true,
+        },
+      });
+
+    if (!existingSoftware) {
+      throw new Error("Software not found.");
+    }
+
+    const data: Prisma.SoftwareUpdateInput = {};
+
+    if (body.name !== undefined) {
+      data.name = body.name.trim();
+    }
+
+    if (body.vendor !== undefined) {
+      data.vendor = normalizeNullableText(body.vendor);
+    }
+
+    if (body.version !== undefined) {
+      data.version = normalizeNullableText(body.version);
+    }
+
+    if (body.licenseRequired !== undefined) {
+      data.licenseRequired = body.licenseRequired;
+    }
+
+    const software = await tx.software.update({
       where: {
         id: softwareId,
       },
+
+      data,
 
       select: {
         id: true,
@@ -225,48 +291,38 @@ export const updateSoftware = async (
         version: true,
         licenseRequired: true,
         isActive: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
-  if (!existingSoftware) {
-    throw new Error("Software not found.");
-  }
+    await createAuditLog(
+      {
+        action: "SOFTWARE_UPDATED",
+        entityType: "SOFTWARE",
+        entityId: String(software.id),
+        actorId,
 
-  const data: Prisma.SoftwareUpdateInput = {};
+        oldValue: {
+          name: existingSoftware.name,
+          vendor: existingSoftware.vendor,
+          version: existingSoftware.version,
+          licenseRequired: existingSoftware.licenseRequired,
+          isActive: existingSoftware.isActive,
+        },
 
-  if (body.name !== undefined) {
-    data.name = body.name.trim();
-  }
+        newValue: {
+          name: software.name,
+          vendor: software.vendor,
+          version: software.version,
+          licenseRequired: software.licenseRequired,
+          isActive: software.isActive,
+        },
+      },
+      tx,
+    );
 
-  if (body.vendor !== undefined) {
-    data.vendor = normalizeNullableText(body.vendor);
-  }
-
-  if (body.version !== undefined) {
-    data.version = normalizeNullableText(body.version);
-  }
-
-  if (body.licenseRequired !== undefined) {
-    data.licenseRequired = body.licenseRequired;
-  }
-
-  return prisma.software.update({
-    where: {
-      id: softwareId,
-    },
-
-    data,
-
-    select: {
-      id: true,
-      name: true,
-      vendor: true,
-      version: true,
-      licenseRequired: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    return software;
   });
 };
 
@@ -276,11 +332,40 @@ export const updateSoftware = async (
 export const updateSoftwareStatus = async (
   softwareId: number,
   body: UpdateSoftwareStatusBody,
+  actorId: number,
 ) => {
-  const existingSoftware =
-    await prisma.software.findUnique({
+  return prisma.$transaction(async (tx) => {
+    const existingSoftware =
+      await tx.software.findUnique({
+        where: {
+          id: softwareId,
+        },
+
+        select: {
+          id: true,
+          name: true,
+          vendor: true,
+          version: true,
+          licenseRequired: true,
+          isActive: true,
+        },
+      });
+
+    if (!existingSoftware) {
+      throw new Error("Software not found.");
+    }
+
+    if (existingSoftware.isActive === body.isActive) {
+      return existingSoftware;
+    }
+
+    const software = await tx.software.update({
       where: {
         id: softwareId,
+      },
+
+      data: {
+        isActive: body.isActive,
       },
 
       select: {
@@ -290,35 +375,33 @@ export const updateSoftwareStatus = async (
         version: true,
         licenseRequired: true,
         isActive: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
-  if (!existingSoftware) {
-    throw new Error("Software not found.");
-  }
+    await createAuditLog(
+      {
+        action: "SOFTWARE_UPDATED",
+        entityType: "SOFTWARE",
+        entityId: String(software.id),
+        actorId,
 
-  if (existingSoftware.isActive === body.isActive) {
-    return existingSoftware;
-  }
+        oldValue: {
+          isActive: existingSoftware.isActive,
+        },
 
-  return prisma.software.update({
-    where: {
-      id: softwareId,
-    },
+        newValue: {
+          isActive: software.isActive,
+        },
 
-    data: {
-      isActive: body.isActive,
-    },
+        metadata: {
+          operation: "STATUS_CHANGE",
+        },
+      },
+      tx,
+    );
 
-    select: {
-      id: true,
-      name: true,
-      vendor: true,
-      version: true,
-      licenseRequired: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    return software;
   });
 };

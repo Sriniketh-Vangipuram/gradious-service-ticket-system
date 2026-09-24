@@ -18,6 +18,9 @@ import {
 } from "../../../../generated/prisma/client";
 import { createNotifications } from "../../../notifications/notification.service";
 import { publishToUser } from "../../../../socket/socket.server";
+import { createAuditLog } from "../../../audit/audit.service";
+
+
 
 const ticketInclude = {
   requester: {
@@ -204,6 +207,34 @@ export async function resolveTicketUseCase(
           : "Ticket resolved by assigned technician.",
       },
     });
+
+    await createAuditLog(
+      {
+        action: "TICKET_RESOLVED",
+        entityType: "TICKET",
+        entityId: String(ticket.id),
+        actorId: actor.userId,
+        oldValue: {
+          status: TicketStatus.IN_PROGRESS,
+        },
+        newValue: {
+          status: TicketStatus.RESOLVED,
+          resolvedAt,
+        },
+        metadata: {
+          lifecycleAction: "RESOLVE",
+          ticketNumber: ticket.ticketNumber,
+          resolution: body.resolution,
+          privilegedOverride: isPrivilegedOverride,
+          overrideReason: isPrivilegedOverride
+            ? body.reason!.trim()
+            : null,
+          slaOutcome,
+          slaDueAt: activeSlaCycle.dueAt,
+        },
+      },
+      tx,
+    );
 
     // Notify the requester that the ticket has been resolved.
     createdNotifications = await createNotifications(tx, {

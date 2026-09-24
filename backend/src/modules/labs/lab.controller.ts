@@ -79,7 +79,7 @@ export async function createLabController(
       "body",
     );
 
-    const lab = await createLab(body);
+    const lab = await createLab(body,req.authUser!.userId);
 
     sendSuccess(
       res,
@@ -118,6 +118,7 @@ export async function updateLabController(
     const lab = await updateLab(
       labId,
       body,
+      req.authUser!.userId
     );
 
     sendSuccess(res, {
@@ -153,6 +154,7 @@ export async function updateLabStatusController(
     const lab = await updateLabStatus(
       labId,
       body,
+      req.authUser!.userId
     );
 
     sendSuccess(res, {

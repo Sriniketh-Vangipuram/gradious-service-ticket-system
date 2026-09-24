@@ -18,6 +18,8 @@ import { createNotifications } from "../../notifications/notification.service";
 import { createHash } from "node:crypto";
 import { createSuccessBody } from "../../../common/http/api-response";
 import { publishToUser } from "../../../socket/socket.server";
+import { createAuditLog } from "../../audit/audit.service";
+
 
 type AuthenticatedActor = {
   userId: number;
@@ -460,6 +462,43 @@ export async function createTicketUseCase(
           updatedAt: true,
         },
       });
+
+      await createAuditLog(
+          {
+            action: "TICKET_CREATED",
+            entityType: "TICKET",
+            entityId: String(ticket.id),
+            actorId: requester.id,
+
+            newValue: {
+              ticketNumber: ticket.ticketNumber,
+              title: ticket.title,
+              description: ticket.description,
+              status: ticket.status,
+              priority: ticket.priority,
+              requestType: ticket.requestType,
+              requesterId: ticket.requesterId,
+              centerId: ticket.centerId,
+              labId: ticket.labId,
+              categoryId: ticket.categoryId,
+              softwareId: ticket.softwareId,
+              firstResponseDueAt,
+              resolutionDueAt,
+              firstResponseTargetMinutes:
+                slaPolicy.firstResponseMinutes,
+              resolutionTargetMinutes:
+                slaPolicy.resolutionMinutes,
+              atRiskThresholdPercent:
+                slaPolicy.atRiskThresholdPercent,
+            },
+
+            metadata: {
+              source: "TICKET_CREATION",
+              slaPolicyPriority: input.priority,
+            },
+          },
+          tx,
+        );
 
       // 15. Find active staff members who have access
       //     to the ticket's center.

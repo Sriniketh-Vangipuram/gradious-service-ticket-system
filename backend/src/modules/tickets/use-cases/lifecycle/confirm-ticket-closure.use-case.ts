@@ -15,6 +15,7 @@ import {
   NotificationType,
 } from "../../../../generated/prisma/client";
 import { publishToUser } from "../../../../socket/socket.server";
+import { createAuditLog } from "../../../audit/audit.service";
 
 
 
@@ -96,6 +97,7 @@ export async function confirmTicketClosureUseCase(
       TicketStatus.CLOSED,
     );
 
+     const closedAt = new Date();
     // Prevent stale/concurrent closure attempts.
     const updateResult = await tx.ticket.updateMany({
       where: {
@@ -105,7 +107,7 @@ export async function confirmTicketClosureUseCase(
       },
       data: {
         status: TicketStatus.CLOSED,
-        closedAt: new Date(),
+        closedAt,
       },
     });
 
@@ -126,6 +128,28 @@ export async function confirmTicketClosureUseCase(
         description: "Ticket closed by requester confirmation.",
       },
     });
+
+    await createAuditLog(
+      {
+        action: "TICKET_CLOSED",
+        entityType: "TICKET",
+        entityId: String(ticket.id),
+        actorId: actor.userId,
+        oldValue: {
+          status: TicketStatus.RESOLVED,
+        },
+        newValue: {
+          status: TicketStatus.CLOSED,
+          closedAt,
+        },
+        metadata: {
+          lifecycleAction: "CONFIRM_CLOSURE",
+          ticketNumber: ticket.ticketNumber,
+          closureConfirmedByRequester: true,
+        },
+      },
+      tx,
+    );
 
     // Notify the assigned technician that the requester closed the ticket.
     if (ticket.assigneeId !== null) {

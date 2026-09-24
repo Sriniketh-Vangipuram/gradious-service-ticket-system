@@ -18,6 +18,9 @@ import {
 import { createNotifications } from "../../../notifications/notification.service";
 import { publishToUser } from "../../../../socket/socket.server";
 import { getBusinessMinutesBetween } from "../../../sla/business-calendar.service";
+import { createAuditLog } from "../../../audit/audit.service";
+
+
 
 const ticketInclude = {
   requester: {
@@ -190,6 +193,27 @@ export async function cancelTicketUseCase(
       },
     });
 
+    await createAuditLog(
+      {
+        action: "TICKET_CANCELLED",
+        entityType: "TICKET",
+        entityId: String(ticket.id),
+        actorId: actor.userId,
+        oldValue: {
+          status: ticket.status,
+        },
+        newValue: {
+          status: TicketStatus.CANCELLED,
+        },
+        metadata: {
+          lifecycleAction: "CANCEL",
+          ticketNumber: ticket.ticketNumber,
+          cancellationReason: body.reason,
+        },
+      },
+      tx,
+    );
+    
     // Notify the requester and assigned technician with
     // recipient-specific cancellation messaging.
     const recipientIds: number[] = [ticket.requesterId];

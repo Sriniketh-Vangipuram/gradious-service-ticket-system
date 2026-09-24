@@ -13,6 +13,8 @@ import type { UpdateTicketBody } from "../ticket.schemas";
 import type { TicketUpdateActor } from "../policies/ticket-update-scope.policy";
 
 import { buildTicketUpdateScope } from "../policies/ticket-update-scope.policy";
+import { createAuditLog } from "../../audit/audit.service";
+
 
 const ticketInclude = {
   requester: {
@@ -157,7 +159,71 @@ function assertAllowedFields(
   }
 }
 
+
+function buildTicketAuditValues(
+  existingTicket: {
+    title: string;
+    description: string;
+    categoryId: number;
+    softwareId: number | null;
+    requestType: string | null;
+  },
+  resultingState: {
+    title: string;
+    description: string;
+    categoryId: number;
+    softwareId: number | null;
+    requestType: string | null;
+  },
+) {
+  return {
+    oldValue: {
+      title: existingTicket.title,
+      description: existingTicket.description,
+      categoryId: existingTicket.categoryId,
+      softwareId: existingTicket.softwareId,
+      requestType: existingTicket.requestType,
+    },
+
+    newValue: {
+      title: resultingState.title,
+      description: resultingState.description,
+      categoryId: resultingState.categoryId,
+      softwareId: resultingState.softwareId,
+      requestType: resultingState.requestType,
+    },
+
+    metadata: {
+      changedFields: [
+        ...(existingTicket.title !== resultingState.title
+          ? ["title"]
+          : []),
+
+        ...(existingTicket.description !==
+        resultingState.description
+          ? ["description"]
+          : []),
+
+        ...(existingTicket.categoryId !==
+        resultingState.categoryId
+          ? ["categoryId"]
+          : []),
+
+        ...(existingTicket.softwareId !==
+        resultingState.softwareId
+          ? ["softwareId"]
+          : []),
+
+        ...(existingTicket.requestType !==
+        resultingState.requestType
+          ? ["requestType"]
+          : []),
+      ],
+    },
+  };
+}
 /**
+ * 
  * Creates history records for meaningful domain-field changes.
  *
  * This function runs inside the same Prisma transaction as the
@@ -316,24 +382,28 @@ export async function updateTicketUseCase(
     );
 
     const existingTicket = await tx.ticket.findFirst({
-      where: scope,
+  where: scope,
 
-      select: {
-        id: true,
+  select: {
+    id: true,
 
-        requesterId: true,
+    requesterId: true,
 
-        assigneeId: true,
+    assigneeId: true,
 
-        status: true,
+    status: true,
 
-        categoryId: true,
+    title: true,
 
-        softwareId: true,
+    description: true,
 
-        requestType: true,
-      },
-    });
+    categoryId: true,
+
+    softwareId: true,
+
+    requestType: true,
+  },
+});
 
     if (!existingTicket) {
       /*
@@ -676,6 +746,40 @@ export async function updateTicketUseCase(
               resultingRequestType,
           },
         );
+
+        const auditValues = buildTicketAuditValues(
+          {
+            title: existingTicket.title,
+            description: existingTicket.description,
+            categoryId: existingTicket.categoryId,
+            softwareId: existingTicket.softwareId,
+            requestType: existingTicket.requestType,
+          },
+
+          {
+            title: updatedTicket.title,
+            description: updatedTicket.description,
+            categoryId: updatedTicket.categoryId,
+            softwareId: updatedTicket.softwareId,
+            requestType: updatedTicket.requestType,
+          },
+        );
+
+
+        if (auditValues.metadata.changedFields.length > 0) {
+          await createAuditLog(
+            {
+              action: "TICKET_UPDATED",
+              entityType: "TICKET",
+              entityId: String(updatedTicket.id),
+              actorId: actor.userId,
+              oldValue: auditValues.oldValue,
+              newValue: auditValues.newValue,
+              metadata: auditValues.metadata,
+            },
+            tx,
+          );
+        }
 
         /*
          * Build socket recipients.

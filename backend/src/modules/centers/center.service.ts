@@ -7,6 +7,8 @@ import type {
   UpdateCenterBody,
   UpdateCenterStatusBody,
 } from "./center.schema";
+import { createAuditLog } from "../audit/audit.service";
+
 
 const normalizeCenterCode = (code: string) => code.trim().toUpperCase();
 
@@ -133,12 +135,13 @@ export const getCenterById = async (centerId: number) => {
   return center;
 };
 
-export const createCenter = async (body: CreateCenterBody) => {
+export const createCenter = async (body: CreateCenterBody,actorId:number) => {
   const name = body.name.trim();
   const code = normalizeCenterCode(body.code);
 
-  try {
-    return await prisma.center.create({
+ try {
+  return await prisma.$transaction(async (tx) => {
+    const center = await tx.center.create({
       data: {
         name,
         code,
@@ -153,14 +156,34 @@ export const createCenter = async (body: CreateCenterBody) => {
         updatedAt: true,
       },
     });
-  } catch (error) {
-    handlePrismaUniqueError(error);
-  }
-};
+
+    await createAuditLog(
+      {
+        action: "CENTER_CREATED",
+        entityType: "CENTER",
+        entityId: String(center.id),
+        actorId,
+
+        newValue: {
+          name: center.name,
+          code: center.code,
+          isActive: center.isActive,
+        },
+      },
+      tx,
+    );
+
+    return center;
+  });
+} catch (error) {
+  handlePrismaUniqueError(error);
+}
+}
 
 export const updateCenter = async (
   centerId: number,
   body: UpdateCenterBody,
+  actorId:number,
 ) => {
   const existingCenter = await prisma.center.findUnique({
     where: {
@@ -189,7 +212,8 @@ export const updateCenter = async (
   }
 
   try {
-    return await prisma.center.update({
+  return await prisma.$transaction(async (tx) => {
+    const updatedCenter = await tx.center.update({
       where: {
         id: centerId,
       },
@@ -203,14 +227,40 @@ export const updateCenter = async (
         updatedAt: true,
       },
     });
-  } catch (error) {
-    handlePrismaUniqueError(error);
-  }
-};
+
+    await createAuditLog(
+      {
+        action: "CENTER_UPDATED",
+        entityType: "CENTER",
+        entityId: String(centerId),
+        actorId,
+
+        oldValue: {
+          name: existingCenter.name,
+          code: existingCenter.code,
+          isActive: existingCenter.isActive,
+        },
+
+        newValue: {
+          name: updatedCenter.name,
+          code: updatedCenter.code,
+          isActive: updatedCenter.isActive,
+        },
+      },
+      tx,
+    );
+
+    return updatedCenter;
+  });
+} catch (error) {
+  handlePrismaUniqueError(error);
+}
+}
 
 export const updateCenterStatus = async (
   centerId: number,
   body: UpdateCenterStatusBody,
+  actorId:number,
 ) => {
   const existingCenter = await prisma.center.findUnique({
     where: {
@@ -242,7 +292,8 @@ export const updateCenterStatus = async (
    * Other workflows should prevent new business operations from using
    * an inactive center.
    */
-  return prisma.center.update({
+  return prisma.$transaction(async (tx) => {
+  const updatedCenter = await tx.center.update({
     where: {
       id: centerId,
     },
@@ -258,4 +309,29 @@ export const updateCenterStatus = async (
       updatedAt: true,
     },
   });
-};
+
+  await createAuditLog(
+    {
+      action: "CENTER_UPDATED",
+      entityType: "CENTER",
+      entityId: String(centerId),
+      actorId,
+
+      oldValue: {
+        isActive: existingCenter.isActive,
+      },
+
+      newValue: {
+        isActive: updatedCenter.isActive,
+      },
+
+      metadata: {
+        operation: "STATUS_CHANGE",
+      },
+    },
+    tx,
+  );
+
+  return updatedCenter;
+});
+}

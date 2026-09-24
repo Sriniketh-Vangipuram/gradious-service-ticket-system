@@ -29,6 +29,10 @@ import {
 } from "../../../../generated/prisma/client";
 
 import type { TicketLifecycleAction } from "../../policies/ticket-lifecycle-access.policy";
+import { createAuditLog } from "../../../audit/audit.service";
+
+
+
 
 const ticketInclude = {
   requester: {
@@ -233,6 +237,26 @@ export async function changeTicketStatusUseCase(
         description: `Ticket status changed from ${ticket.status} to ${nextStatus}.`,
       },
     });
+
+    await createAuditLog(
+      {
+        action: "TICKET_STATUS_CHANGED",
+        entityType: "TICKET",
+        entityId: String(ticket.id),
+        actorId: actor.userId,
+        oldValue: {
+          status: ticket.status,
+        },
+        newValue: {
+          status: nextStatus,
+        },
+        metadata: {
+          lifecycleAction: action,
+          ticketNumber: ticket.ticketNumber,
+        },
+      },
+      tx,
+    );
 
     // 7. Notify the requester and assigned technician with
     // recipient-specific messaging.

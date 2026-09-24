@@ -1,6 +1,8 @@
 import { Prisma } from "../../generated/prisma/client";
 import { prisma } from "../../config/database";
 
+import { createAuditLog } from "../audit/audit.service";
+
 import type {
   CreateLabBody,
   ListLabsQuery,
@@ -188,39 +190,84 @@ export const getLabById = async (labId: number) => {
 /**
  * Create a lab.
  */
-export const createLab = async (body: CreateLabBody) => {
+export const createLab = async (
+  body: CreateLabBody,
+  actorId: number,
+) => {
   const name = body.name.trim();
   const code = normalizeLabCode(body.code);
 
-  // A lab can only belong to an active center.
-  await ensureActiveCenter(body.centerId);
-
   try {
-    return await prisma.lab.create({
-      data: {
-        centerId: body.centerId,
-        name,
-        code,
-        isActive: true,
-      },
+    // Everything inside this transaction either succeeds together
+    // or rolls back together.
+    return await prisma.$transaction(async (tx) => {
+      const center = await tx.center.findUnique({
+        where: {
+          id: body.centerId,
+        },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          isActive: true,
+        },
+      });
 
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        isActive: true,
-        centerId: true,
-        createdAt: true,
-        updatedAt: true,
+      if (!center) {
+        throw new Error("Center not found.");
+      }
 
-        center: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
+      if (!center.isActive) {
+        throw new Error(
+          "Cannot assign a lab to an inactive center.",
+        );
+      }
+
+      const lab = await tx.lab.create({
+        data: {
+          centerId: body.centerId,
+          name,
+          code,
+          isActive: true,
+        },
+
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          isActive: true,
+          centerId: true,
+          createdAt: true,
+          updatedAt: true,
+
+          center: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
           },
         },
-      },
+      });
+
+      await createAuditLog(
+        {
+          action: "LAB_CREATED",
+          entityType: "LAB",
+          entityId: String(lab.id),
+          actorId,
+
+          newValue: {
+            name: lab.name,
+            code: lab.code,
+            centerId: lab.centerId,
+            isActive: lab.isActive,
+          },
+        },
+        tx,
+      );
+
+      return lab;
     });
   } catch (error) {
     handlePrismaUniqueError(error);
@@ -233,70 +280,117 @@ export const createLab = async (body: CreateLabBody) => {
 export const updateLab = async (
   labId: number,
   body: UpdateLabBody,
+  actorId: number,
 ) => {
-  const existingLab = await prisma.lab.findUnique({
-    where: {
-      id: labId,
-    },
-
-    select: {
-      id: true,
-      name: true,
-      code: true,
-      centerId: true,
-      isActive: true,
-    },
-  });
-
-  if (!existingLab) {
-    throw new Error("Lab not found.");
-  }
-
-  const data: Prisma.LabUpdateInput = {};
-
-  if (body.name !== undefined) {
-    data.name = body.name.trim();
-  }
-
-  if (body.code !== undefined) {
-    data.code = normalizeLabCode(body.code);
-  }
-
-  if (body.centerId !== undefined) {
-    await ensureActiveCenter(body.centerId);
-
-    data.center = {
-      connect: {
-        id: body.centerId,
-      },
-    };
-  }
-
   try {
-    return await prisma.lab.update({
-      where: {
-        id: labId,
-      },
+    return await prisma.$transaction(async (tx) => {
+      const existingLab = await tx.lab.findUnique({
+        where: {
+          id: labId,
+        },
 
-      data,
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          centerId: true,
+          isActive: true,
+        },
+      });
 
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        isActive: true,
-        centerId: true,
-        createdAt: true,
-        updatedAt: true,
+      if (!existingLab) {
+        throw new Error("Lab not found.");
+      }
 
-        center: {
+      const data: Prisma.LabUpdateInput = {};
+
+      if (body.name !== undefined) {
+        data.name = body.name.trim();
+      }
+
+      if (body.code !== undefined) {
+        data.code = normalizeLabCode(body.code);
+      }
+
+      if (body.centerId !== undefined) {
+        const center = await tx.center.findUnique({
+          where: {
+            id: body.centerId,
+          },
           select: {
             id: true,
-            name: true,
-            code: true,
+            isActive: true,
+          },
+        });
+
+        if (!center) {
+          throw new Error("Center not found.");
+        }
+
+        if (!center.isActive) {
+          throw new Error(
+            "Cannot assign a lab to an inactive center.",
+          );
+        }
+
+        data.center = {
+          connect: {
+            id: body.centerId,
+          },
+        };
+      }
+
+      const lab = await tx.lab.update({
+        where: {
+          id: labId,
+        },
+
+        data,
+
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          isActive: true,
+          centerId: true,
+          createdAt: true,
+          updatedAt: true,
+
+          center: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
           },
         },
-      },
+      });
+
+      await createAuditLog(
+        {
+          action: "LAB_UPDATED",
+          entityType: "LAB",
+          entityId: String(lab.id),
+          actorId,
+
+          oldValue: {
+            name: existingLab.name,
+            code: existingLab.code,
+            centerId: existingLab.centerId,
+            isActive: existingLab.isActive,
+          },
+
+          newValue: {
+            name: lab.name,
+            code: lab.code,
+            centerId: lab.centerId,
+            isActive: lab.isActive,
+          },
+        },
+        tx,
+      );
+
+      return lab;
     });
   } catch (error) {
     handlePrismaUniqueError(error);
@@ -309,58 +403,107 @@ export const updateLab = async (
 export const updateLabStatus = async (
   labId: number,
   body: UpdateLabStatusBody,
+  actorId: number,
 ) => {
-  const existingLab = await prisma.lab.findUnique({
-    where: {
-      id: labId,
-    },
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const existingLab = await tx.lab.findUnique({
+        where: {
+          id: labId,
+        },
 
-    select: {
-      id: true,
-      name: true,
-      code: true,
-      centerId: true,
-      isActive: true,
-    },
-  });
-
-  if (!existingLab) {
-    throw new Error("Lab not found.");
-  }
-
-  if (existingLab.isActive === body.isActive) {
-    return existingLab;
-  }
-
-  if (body.isActive) {
-    await ensureActiveCenter(existingLab.centerId);
-  }
-
-  return prisma.lab.update({
-    where: {
-      id: labId,
-    },
-
-    data: {
-      isActive: body.isActive,
-    },
-
-    select: {
-      id: true,
-      name: true,
-      code: true,
-      isActive: true,
-      centerId: true,
-      createdAt: true,
-      updatedAt: true,
-
-      center: {
         select: {
           id: true,
           name: true,
           code: true,
+          centerId: true,
+          isActive: true,
         },
-      },
-    },
-  });
+      });
+
+      if (!existingLab) {
+        throw new Error("Lab not found.");
+      }
+
+      if (existingLab.isActive === body.isActive) {
+        return existingLab;
+      }
+
+      if (body.isActive) {
+        const center = await tx.center.findUnique({
+          where: {
+            id: existingLab.centerId,
+          },
+          select: {
+            id: true,
+            isActive: true,
+          },
+        });
+
+        if (!center) {
+          throw new Error("Center not found.");
+        }
+
+        if (!center.isActive) {
+          throw new Error(
+            "Cannot activate a lab under an inactive center.",
+          );
+        }
+      }
+
+      const lab = await tx.lab.update({
+        where: {
+          id: labId,
+        },
+
+        data: {
+          isActive: body.isActive,
+        },
+
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          isActive: true,
+          centerId: true,
+          createdAt: true,
+          updatedAt: true,
+
+          center: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
+        },
+      });
+
+      await createAuditLog(
+        {
+          action: "LAB_UPDATED",
+          entityType: "LAB",
+          entityId: String(lab.id),
+          actorId,
+
+          oldValue: {
+            isActive: existingLab.isActive,
+          },
+
+          newValue: {
+            isActive: lab.isActive,
+          },
+
+          metadata: {
+            operation: "STATUS_CHANGE",
+          },
+        },
+        tx,
+      );
+
+      return lab;
+    });
+  } catch (error) {
+    handlePrismaUniqueError(error);
+  }
 };

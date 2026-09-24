@@ -90,7 +90,7 @@ export async function createCategoryController(
       "body",
     );
 
-    const category = await createCategory(body);
+    const category = await createCategory(body,req.authUser!.userId);
 
     sendSuccess(
       res,
@@ -129,6 +129,7 @@ export async function updateCategoryController(
     const category = await updateCategory(
       categoryId,
       body,
+      req.authUser!.userId
     );
 
     sendSuccess(res, {
@@ -164,6 +165,7 @@ export async function updateCategoryStatusController(
     const category = await updateCategoryStatus(
       categoryId,
       body,
+      req.authUser!.userId
     );
 
     sendSuccess(res, {

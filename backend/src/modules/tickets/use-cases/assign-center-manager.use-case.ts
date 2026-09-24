@@ -18,6 +18,8 @@ import type { AssignCenterManagerBody } from "../ticket.schemas";
 
 import { createNotifications } from "../../notifications/notification.service";
 import { publishToUser } from "../../../socket/socket.server";
+import { createAuditLog } from "../../audit/audit.service";
+
 
 const ticketInclude = {
   requester: {
@@ -221,6 +223,31 @@ export async function assignCenterManagerUseCase(
         assignedById: actor.userId,
       },
     });
+
+    await createAuditLog(
+      {
+        action: "TICKET_ASSIGNED",
+        entityType: "TICKET",
+        entityId: String(ticket.id),
+        actorId: actor.userId,
+
+        oldValue: {
+          assignmentType: AssignmentType.CENTER_MANAGER,
+          centerManagerId: ticket.centerManagerId,
+        },
+
+        newValue: {
+          assignmentType: AssignmentType.CENTER_MANAGER,
+          centerManagerId: body.centerManagerId,
+        },
+
+        metadata: {
+          assignmentEvent,
+          ticketNumber: ticket.ticketNumber,
+        },
+      },
+      tx,
+    );
 
     /*
      * 7. Notify the requester.

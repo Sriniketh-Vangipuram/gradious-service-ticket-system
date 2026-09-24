@@ -90,7 +90,7 @@ export async function createSoftwareController(
       "body",
     );
 
-    const software = await createSoftware(body);
+    const software = await createSoftware(body,req.authUser!.userId);
 
     sendSuccess(
       res,
@@ -129,6 +129,7 @@ export async function updateSoftwareController(
     const software = await updateSoftware(
       softwareId,
       body,
+      req.authUser!.userId
     );
 
     sendSuccess(res, {
@@ -164,6 +165,7 @@ export async function updateSoftwareStatusController(
     const software = await updateSoftwareStatus(
       softwareId,
       body,
+      req.authUser!.userId
     );
 
     sendSuccess(res, {

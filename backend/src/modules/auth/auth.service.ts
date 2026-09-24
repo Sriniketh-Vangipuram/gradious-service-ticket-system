@@ -6,6 +6,7 @@ import {env} from "../../config/env";
 
 import { createAccessToken,generateRefreshToken,hashRefreshToken } from "./auth.tokens";
 import type { LoginInput,RegisterInput } from "./auth.schemas";
+import { createAuditLog } from "../audit/audit.service";
 
 export class AuthError extends Error{
     constructor(
@@ -19,50 +20,74 @@ export class AuthError extends Error{
 
 
 export async function register(input:RegisterInput){
-  const existingUser=await prisma.user.findUnique({
-    where:{
-      email:input.email
-    },
-    select:{
-      id:true
-    }
-  });
 
-  if(existingUser){
-    throw new AuthError("Email is already registered",409);
-  }
-
-  const passwordHash=await bcrypt.hash(input.password,12);
+  const passwordHash = await bcrypt.hash(input.password, 12);
 
   try {
-    const user = await prisma.user.create({
-      data:{
-        fullName:input.fullName,
-        email:input.email,
-        passwordHash,
-        role:"EMPLOYEE"
-      },
+    const user = await prisma.$transaction(async (tx) => {
+      const existingUser = await tx.user.findUnique({
+        where: {
+          email: input.email,
+        },
+        select: {
+          id: true,
+        },
+      });
 
-      select:{
-        id:true,
-        fullName:true,
-        email:true,
-        role:true,
-        centerId:true,
-        labId:true,
+      if (existingUser) {
+        throw new AuthError("Email is already registered", 409);
       }
+
+      const createdUser = await tx.user.create({
+        data: {
+          fullName: input.fullName,
+          email: input.email,
+          passwordHash,
+          role: "EMPLOYEE",
+        },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          role: true,
+          centerId: true,
+          labId: true,
+        },
+      });
+
+      await createAuditLog(
+        {
+          action: "USER_CREATED",
+          entityType: "USER",
+          entityId: String(createdUser.id),
+          actorId: createdUser.id,
+          newValue: {
+            fullName: createdUser.fullName,
+            email: createdUser.email,
+            role: createdUser.role,
+            centerId: createdUser.centerId,
+            labId: createdUser.labId,
+            isActive: true,
+          },
+          metadata: {
+            source: "PUBLIC_REGISTRATION",
+          },
+        },
+        tx,
+      );
+
+      return createdUser;
     });
 
-    return {user};
-  }
-
-  catch(error:unknown){
-    if(typeof error === "object" && 
-      error !==null &&
+    return { user };
+  } catch (error: unknown) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
       "code" in error &&
       error.code === "P2002"
-    ){
-      throw new AuthError("Email is already registered",409);
+    ) {
+      throw new AuthError("Email is already registered", 409);
     }
 
     throw error;
@@ -85,7 +110,22 @@ export async function login(
 
     // if no user is found. Then return 401 (unauthorized)
     if(!user){
-        throw new AuthError("Invalid email or Password",401);
+        
+        await createAuditLog({
+        action: "AUTHENTICATION_EVENT",
+        entityType: "AUTHENTICATION",
+        entityId: "UNKNOWN",
+        actorId: null,
+        metadata: {
+          event: "LOGIN_FAILED",
+          reason: "INVALID_CREDENTIALS",
+          email: input.email,
+          userAgent: metadata.userAgent ?? null,
+          ipAddress: metadata.ipAddress ?? null,
+        },
+      });
+      
+      throw new AuthError("Invalid email or Password",401);
     }
 
     const passwordMatches=await bcrypt.compare(input.password,user.passwordHash);
@@ -195,6 +235,7 @@ export async function refreshSession(
         },
         data: { revokedAt: now }
       });
+      
 
       return {
         ok: false,
@@ -284,6 +325,18 @@ export async function refreshSession(
       }
     });
 
+    await createAuditLog({
+      action: "AUTHENTICATION_EVENT",
+      entityType: "AUTHENTICATION",
+      entityId: String(session.user.id),
+      actorId: session.user.id,
+      metadata: {
+        event: "REFRESH_SUCCESS",
+        userAgent: metadata.userAgent ?? null,
+        ipAddress: metadata.ipAddress ?? null,
+      },
+    });
+
     const accessToken = await createAccessToken({
       userId: session.user.id,
       role: session.user.role
@@ -314,23 +367,57 @@ export async function refreshSession(
 }
 
 
-export async function logout(rawRefreshToken?:string):Promise<void>{
-    if(!rawRefreshToken){
-        return;
+export async function logout(rawRefreshToken?: string): Promise<void> {
+  if (!rawRefreshToken) {
+    return;
+  }
+
+  const tokenHash = hashRefreshToken(rawRefreshToken);
+
+  await prisma.$transaction(async (tx) => {
+    const session = await tx.refreshSession.findUnique({
+      where: {
+        tokenHash,
+      },
+      select: {
+        id: true,
+        userId: true,
+        revokedAt: true,
+      },
+    });
+
+    if (!session || session.revokedAt !== null) {
+      return;
     }
 
-    await prisma.refreshSession.updateMany({
-        where:{
-            tokenHash:hashRefreshToken(rawRefreshToken),
-            revokedAt:null
-        },
-
-        data:{
-            revokedAt:new Date()
-        }
+    const result = await tx.refreshSession.updateMany({
+      where: {
+        id: session.id,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
     });
-}
 
+    if (result.count !== 1) {
+      return;
+    }
+
+    await createAuditLog(
+      {
+        action: "AUTHENTICATION_EVENT",
+        entityType: "AUTHENTICATION",
+        entityId: String(session.userId),
+        actorId: session.userId,
+        metadata: {
+          event: "LOGOUT",
+        },
+      },
+      tx,
+    );
+  });
+}
 export async function getCurrentUser(userId: number) {
   const user = await prisma.user.findUnique({
     where: {
