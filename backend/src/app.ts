@@ -15,6 +15,7 @@ import userRouter from "./modules/users/user.routes";
 import centerRouter from "./modules/centers/center.routes";
 import labRouter from "./modules/labs/lab.routes";
 import categoryRouter from "./modules/catalog/categories/category.routes";
+import softwareRouter from "./modules/catalog/software/software.routes";
 import { env } from "./config/env";
 import crypto from "node:crypto";
 
@@ -57,5 +58,6 @@ app.use("/api/v1/users",userRouter);
 app.use("/api/v1/centers",centerRouter);
 app.use("/api/v1/labs",labRouter);
 app.use("/api/v1/categories",categoryRouter);
+app.use("/api/v1/software",softwareRouter);
 // Must be registered after routes.
 app.use(errorMiddleware);
