@@ -2,6 +2,8 @@
 import { TicketPriority } from "../../generated/prisma/client";
 import { prisma } from "../../config/database";
 import type { Prisma } from "../../generated/prisma/client";
+import { AppError } from "../../common/errors/app-error";
+
 
 type DatabaseClient = Prisma.TransactionClient | typeof prisma;
 
@@ -26,7 +28,8 @@ export async function getActiveSlaPolicy(
   });
 
   if (!policy) {
-    throw new Error(
+    throw new AppError(
+      "NOT_FOUND",
       `No active SLA policy configured for priority: ${priority}`
     );
   }

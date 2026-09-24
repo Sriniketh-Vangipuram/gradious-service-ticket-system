@@ -4,6 +4,9 @@ import { requireAuth } from "../../middleware/auth.middleware";
 
 import { validateRequest } from "../../common/validation/validate-request";
 
+
+import slaPolicyRoutes from "./policies/sla-policy.routes";
+
 import {
   listSlaTicketsQuerySchema,
   slaOverviewQuerySchema,
@@ -33,5 +36,7 @@ router.get(
   }),
   getSlaOverviewController,
 );
+
+router.use("/policies", slaPolicyRoutes);
 
 export default router;

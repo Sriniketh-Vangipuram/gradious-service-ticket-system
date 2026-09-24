@@ -17,6 +17,7 @@ import labRouter from "./modules/labs/lab.routes";
 import categoryRouter from "./modules/catalog/categories/category.routes";
 import softwareRouter from "./modules/catalog/software/software.routes";
 import slaRoutes from "./modules/sla/sla.routes";
+
 import { env } from "./config/env";
 import crypto from "node:crypto";
 
