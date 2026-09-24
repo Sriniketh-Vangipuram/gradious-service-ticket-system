@@ -12,6 +12,8 @@ import ticketRouter from "./modules/tickets/ticket.routes";
 import notificationRoutes from "./modules/notifications/notification.routes";
 import catalogRouter from "./modules/catalog/catalog.routes";
 import userRouter from "./modules/users/user.routes";
+import centerRouter from "./modules/centers/center.routes";
+import labRouter from "./modules/labs/lab.routes";
 import { env } from "./config/env";
 import crypto from "node:crypto";
 
@@ -51,5 +53,7 @@ app.use("/api/v1/tickets", ticketRouter);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/catalog", catalogRouter);
 app.use("/api/v1/users",userRouter);
+app.use("/api/v1/centers",centerRouter);
+app.use("/api/v1/labs",labRouter);
 // Must be registered after routes.
 app.use(errorMiddleware);

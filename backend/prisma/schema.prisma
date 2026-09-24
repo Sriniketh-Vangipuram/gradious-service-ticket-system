@@ -64,7 +64,7 @@ model User {
 
 model Center {
   id       Int       @id @default(autoincrement())
-  name     String    @db.VarChar(120)
+  name     String    @unique @db.VarChar(120)
   code     String    @unique @db.VarChar(30)
   isActive Boolean   @default(true)
   labs     Lab[]
