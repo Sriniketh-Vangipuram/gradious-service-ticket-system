@@ -158,13 +158,20 @@ export const updateTicketBodySchema = z
     }
   });
 
-export const assignTicketBodySchema = z.object({
-  assigneeId: z.coerce
+export const assignCenterManagerBodySchema = z.object({
+  centerManagerId: z.coerce
     .number()
     .int()
-    .positive()
-    .nullable(),
+    .positive(),
 }).strict();
+
+export const assignTechnicianBodySchema = z.object({
+  technicianId: z.coerce
+    .number()
+    .int()
+    .positive(),
+}).strict();
+
 
 const ordinaryTicketStatusValues = [
   "TRIAGED",
@@ -220,11 +227,17 @@ export type UpdateTicketBody = z.infer<
   typeof updateTicketBodySchema
 >;
 
-export type AssignTicketBody = z.infer<typeof assignTicketBodySchema>;
 export type ChangeTicketStatusBody = z.infer<typeof changeTicketStatusBodySchema>;
 export type ResolveTicketBody = z.infer<typeof resolveTicketBodySchema>;
 export type ReopenTicketBody = z.infer<typeof reopenTicketBodySchema>;
 
 export type CancelTicketBody = z.infer<
   typeof cancelTicketBodySchema
+>;
+export type AssignCenterManagerBody = z.infer<
+  typeof assignCenterManagerBodySchema
+>;
+
+export type AssignTechnicianBody = z.infer<
+  typeof assignTechnicianBodySchema
 >;

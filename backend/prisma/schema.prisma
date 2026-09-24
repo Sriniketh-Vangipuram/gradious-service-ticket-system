@@ -30,6 +30,7 @@ model User {
   isActive     Boolean  @default(true)
 
   requestedTickets     Ticket[]            @relation("TicketRequester")
+  managedTickets       Ticket[]            @relation("TicketCenterManager")
   assignedTickets      Ticket[]            @relation("TicketAssignee")
   commentsAuthored     Comment[]           @relation("CommentAuthor")
   ticketHistoryActions TicketHistory[]     @relation("TicketHistoryActor")
@@ -202,6 +203,11 @@ model Ticket {
   requesterId Int
   requester   User @relation("TicketRequester", fields: [requesterId], references: [id], onDelete: Restrict)
 
+  // Administrative ownership/routing
+  centerManagerId Int?
+  centerManager   User? @relation("TicketCenterManager", fields: [centerManagerId], references: [id], onDelete: SetNull)
+
+  // Technical execution
   assigneeId Int?
   assignee   User? @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
 
@@ -236,6 +242,7 @@ model Ticket {
   updatedAt DateTime @updatedAt
 
   @@index([requesterId, createdAt])
+  @@index([centerManagerId, status, createdAt])
   @@index([assigneeId, status])
   @@index([centerId, status, createdAt])
   @@index([labId, status])
@@ -245,6 +252,11 @@ model Ticket {
 enum CommentVisibility {
   PUBLIC
   INTERNAL
+}
+
+enum AssignmentType {
+  CENTER_MANAGER
+  TECHNICIAN
 }
 
 enum TicketHistoryEvent {
@@ -307,6 +319,7 @@ model TicketHistory {
 model AssignmentHistory {
   id    Int             @id @default(autoincrement())
   event AssignmentEvent
+  type  AssignmentType
 
   ticketId Int
   ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
@@ -323,6 +336,7 @@ model AssignmentHistory {
   createdAt DateTime @default(now())
 
   @@index([ticketId, createdAt])
+  @@index([ticketId, type, createdAt])
   @@index([fromUserId, createdAt])
   @@index([toUserId, createdAt])
   @@index([assignedById, createdAt])

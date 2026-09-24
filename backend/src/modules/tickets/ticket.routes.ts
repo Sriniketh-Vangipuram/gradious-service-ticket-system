@@ -9,11 +9,12 @@ import {
   listTicketsQuerySchema,
   updateTicketBodySchema,
   updateTicketParamsSchema,
-  assignTicketBodySchema,
   changeTicketStatusBodySchema,
   resolveTicketBodySchema,
   reopenTicketBodySchema,
   cancelTicketBodySchema,
+  assignCenterManagerBodySchema,
+  assignTechnicianBodySchema,
 
 } from "./ticket.schemas";
 
@@ -22,13 +23,15 @@ import {
   getTicketController,
   listTicketsController,
   updateTicketController,
-  assignTicketController,
   changeTicketStatusController,
   resolveTicketController,
   confirmTicketClosureController,
   reopenTicketController,
   cancelTicketController,
   getEligibleTechniciansController,
+  assignCenterManagerController,
+  assignTechnicianController,
+  getEligibleManagersController,
 } from "./ticket.controller";
 
 import commentRouter from "../comments/comment.routes";
@@ -72,6 +75,16 @@ ticketRouter.patch(
   updateTicketController,
 );
 
+ticketRouter.get(
+  "/:ticketId/eligible-managers",
+  requireAuth,
+  validateRequest({
+    params: ticketIdParamsSchema,
+  }),
+  getEligibleManagersController,
+);
+
+
 
 ticketRouter.get(
   "/:ticketId/eligible-technicians",
@@ -82,18 +95,26 @@ ticketRouter.get(
   getEligibleTechniciansController,
 );
 
-
 ticketRouter.patch(
-  "/:ticketId/assignment",
+  "/:ticketId/manager",
   requireAuth,
   validateRequest({
-    params: updateTicketParamsSchema,
-    body: assignTicketBodySchema,
+    params: ticketIdParamsSchema,
+    body: assignCenterManagerBodySchema,
   }),
-  assignTicketController,
+  assignCenterManagerController,
 );
 
 
+ticketRouter.patch(
+  "/:ticketId/technician",
+  requireAuth,
+  validateRequest({
+    params: ticketIdParamsSchema,
+    body: assignTechnicianBodySchema,
+  }),
+  assignTechnicianController,
+);
 
 ticketRouter.patch(
   "/:ticketId/status",

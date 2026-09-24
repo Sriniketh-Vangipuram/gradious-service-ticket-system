@@ -16,8 +16,7 @@ import { AppError } from "../../common/errors/app-error";
 
 import { updateTicketUseCase } from "./use-cases/update-ticket.use-case";
 
-import { assignTicketBodySchema,changeTicketStatusBodySchema } from "./ticket.schemas";
-import { assignTicketUseCase } from "./use-cases/assign-ticket.use-case";
+import { changeTicketStatusBodySchema } from "./ticket.schemas";
 import { changeTicketStatusUseCase } from "./use-cases/lifecycle/change-ticket-status.use-case";
 import { resolveTicketBodySchema } from "./ticket.schemas";
 import { resolveTicketUseCase } from "./use-cases/lifecycle/resolve-ticket.use-case";
@@ -28,6 +27,21 @@ import { cancelTicketBodySchema } from "./ticket.schemas";
 import { cancelTicketUseCase } from "./use-cases/lifecycle/cancel-ticket.use-case";
 import { createSuccessBody } from "../../common/http/api-response";
 import { getEligibleTechniciansUseCase } from "./use-cases/get-eligible-technicians.use-case";
+import {
+  assignCenterManagerBodySchema,
+  assignTechnicianBodySchema,
+} from "./ticket.schemas";
+
+import {
+  getEligibleManagersUseCase,
+} from "./use-cases/get-eligible-managers.use-case";
+
+import {
+  assignCenterManagerUseCase,
+} from "./use-cases/assign-center-manager.use-case";
+
+import { assignTechnicianUseCase } from "./use-cases/assign-technician.use-case";
+
 
 
 export async function createTicketController(
@@ -170,47 +184,6 @@ export async function updateTicketController(
     }
 
     const ticket = await updateTicketUseCase(
-      ticketId,
-      body,
-      actor,
-    );
-
-    sendSuccess(res, { ticket });
-  } catch (error) {
-    next(error);
-  }
-}
-
-
-export async function assignTicketController(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
-    const { ticketId } = getValidatedData(
-      req,
-      { params: updateTicketParamsSchema },
-      "params",
-    );
-
-    const body = getValidatedData(
-      req,
-      { body: assignTicketBodySchema },
-      "body",
-    );
-
-    const actor = req.authUser;
-
-    if (!actor) {
-      return next(
-        new Error(
-          "Authenticated user missing after requireAuth middleware.",
-        ),
-      );
-    }
-
-    const ticket = await assignTicketUseCase(
       ticketId,
       body,
       actor,
@@ -410,6 +383,44 @@ export async function cancelTicketController(
   }
 }
 
+export async function getEligibleManagersController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { ticketId } = getValidatedData(
+      req,
+      {
+        params: ticketIdParamsSchema,
+      },
+      "params",
+    );
+
+    const actor = req.authUser;
+
+    if (!actor) {
+      return next(
+        new Error(
+          "Authenticated user missing after requireAuth middleware.",
+        ),
+      );
+    }
+
+    const managers =
+      await getEligibleManagersUseCase(
+        ticketId,
+        actor,
+      );
+
+    sendSuccess(res, {
+      managers,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function getEligibleTechniciansController(
   req: Request,
   res: Response,
@@ -438,6 +449,101 @@ export async function getEligibleTechniciansController(
     );
 
     sendSuccess(res, result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+
+export async function assignCenterManagerController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { ticketId } = getValidatedData(
+      req,
+      {
+        params: ticketIdParamsSchema,
+      },
+      "params",
+    );
+
+    const body = getValidatedData(
+      req,
+      {
+        body: assignCenterManagerBodySchema,
+      },
+      "body",
+    );
+
+    const actor = req.authUser;
+
+    if (!actor) {
+      return next(
+        new Error(
+          "Authenticated user missing after requireAuth middleware.",
+        ),
+      );
+    }
+
+    const ticket =
+      await assignCenterManagerUseCase(
+        ticketId,
+        body,
+        actor,
+      );
+
+    sendSuccess(res, {
+      ticket,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function assignTechnicianController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { ticketId } = getValidatedData(
+      req,
+      {
+        params: ticketIdParamsSchema,
+      },
+      "params",
+    );
+
+    const body = getValidatedData(
+      req,
+      {
+        body: assignTechnicianBodySchema,
+      },
+      "body",
+    );
+
+    const actor = req.authUser;
+
+    if (!actor) {
+      return next(
+        new Error(
+          "Authenticated user missing after requireAuth middleware.",
+        ),
+      );
+    }
+
+    const ticket =
+      await assignTechnicianUseCase(
+        ticketId,
+        body,
+        actor,
+      );
+
+    sendSuccess(res, {
+      ticket,
+    });
   } catch (error) {
     next(error);
   }

@@ -73,6 +73,14 @@ export async function getTicketUseCase(
                 },
             },
 
+            centerManager: {
+                select: {
+                    id: true,
+                    fullName: true,
+                    email: true,
+                },
+            },
+
             assignee:{
                 select:{
                     id:true,
