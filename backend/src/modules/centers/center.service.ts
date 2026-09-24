@@ -1,0 +1,261 @@
+import { Prisma } from "../../generated/prisma/client";
+
+import { prisma } from "../../config/database";
+import type {
+  CreateCenterBody,
+  ListCentersQuery,
+  UpdateCenterBody,
+  UpdateCenterStatusBody,
+} from "./center.schema";
+
+const normalizeCenterCode = (code: string) => code.trim().toUpperCase();
+
+const handlePrismaUniqueError = (error: unknown): never => {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  ) {
+    throw new Error("A center with the same name or code already exists.");
+  }
+
+  throw error;
+};
+
+export const listCenters = async (query: ListCentersQuery) => {
+  const { search, isActive, page, limit } = query;
+
+  const where: Prisma.CenterWhereInput = {};
+
+  if (isActive !== undefined) {
+    where.isActive = isActive;
+  }
+
+  if (search) {
+    where.OR = [
+      {
+        name: {
+          contains: search,
+        },
+      },
+      {
+        code: {
+          contains: search,
+        },
+      },
+    ];
+  }
+
+  const skip = (page - 1) * limit;
+
+  const [centers, total] = await prisma.$transaction([
+    prisma.center.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: {
+        name: "asc",
+      },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            labs: true,
+            tickets: true,
+            primaryUsers: true,
+            userAccess: true,
+          },
+        },
+      },
+    }),
+
+    prisma.center.count({
+      where,
+    }),
+  ]);
+
+  return {
+    data: centers,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};
+
+export const getCenterById = async (centerId: number) => {
+  const center = await prisma.center.findUnique({
+    where: {
+      id: centerId,
+    },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      isActive: true,
+      createdAt: true,
+      updatedAt: true,
+
+      _count: {
+        select: {
+          labs: true,
+          tickets: true,
+          primaryUsers: true,
+          userAccess: true,
+          holidays: true,
+        },
+      },
+
+      labs: {
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          isActive: true,
+        },
+        orderBy: {
+          name: "asc",
+        },
+      },
+    },
+  });
+
+  if (!center) {
+    throw new Error("Center not found.");
+  }
+
+  return center;
+};
+
+export const createCenter = async (body: CreateCenterBody) => {
+  const name = body.name.trim();
+  const code = normalizeCenterCode(body.code);
+
+  try {
+    return await prisma.center.create({
+      data: {
+        name,
+        code,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  } catch (error) {
+    handlePrismaUniqueError(error);
+  }
+};
+
+export const updateCenter = async (
+  centerId: number,
+  body: UpdateCenterBody,
+) => {
+  const existingCenter = await prisma.center.findUnique({
+    where: {
+      id: centerId,
+    },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      isActive: true,
+    },
+  });
+
+  if (!existingCenter) {
+    throw new Error("Center not found.");
+  }
+
+  const data: Prisma.CenterUpdateInput = {};
+
+  if (body.name !== undefined) {
+    data.name = body.name.trim();
+  }
+
+  if (body.code !== undefined) {
+    data.code = normalizeCenterCode(body.code);
+  }
+
+  try {
+    return await prisma.center.update({
+      where: {
+        id: centerId,
+      },
+      data,
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  } catch (error) {
+    handlePrismaUniqueError(error);
+  }
+};
+
+export const updateCenterStatus = async (
+  centerId: number,
+  body: UpdateCenterStatusBody,
+) => {
+  const existingCenter = await prisma.center.findUnique({
+    where: {
+      id: centerId,
+    },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      isActive: true,
+    },
+  });
+
+  if (!existingCenter) {
+    throw new Error("Center not found.");
+  }
+
+  if (existingCenter.isActive === body.isActive) {
+    return existingCenter;
+  }
+
+  /*
+   * We intentionally do not delete or detach anything when a center
+   * becomes inactive.
+   *
+   * Existing tickets, users, labs and historical relationships remain
+   * associated with the center.
+   *
+   * Other workflows should prevent new business operations from using
+   * an inactive center.
+   */
+  return prisma.center.update({
+    where: {
+      id: centerId,
+    },
+    data: {
+      isActive: body.isActive,
+    },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      isActive: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+};
