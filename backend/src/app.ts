@@ -18,7 +18,7 @@ import categoryRouter from "./modules/catalog/categories/category.routes";
 import softwareRouter from "./modules/catalog/software/software.routes";
 import slaRoutes from "./modules/sla/sla.routes";
 import auditRoutes from "./modules/audit/audit.routes";
-
+import analyticsRoutes from "./modules/analytics/analytics.routes";
 
 import { env } from "./config/env";
 import crypto from "node:crypto";
@@ -65,6 +65,7 @@ app.use("/api/v1/categories",categoryRouter);
 app.use("/api/v1/software",softwareRouter);
 app.use("/api/v1/sla",slaRoutes);
 app.use("/api/v1/audit-logs",auditRoutes);
+app.use("/api/v1/analytics",analyticsRoutes);
 
 // Must be registered after routes.
 app.use(errorMiddleware);
