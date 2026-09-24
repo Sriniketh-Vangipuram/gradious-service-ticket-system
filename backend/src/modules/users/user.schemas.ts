@@ -68,3 +68,76 @@ export const updateUserSpecializationsBodySchema = z.object({
     ),
 });
 
+
+export const updateUserStatusBodySchema = z
+  .object({
+    isActive: z.boolean(),
+  })
+  .strict();
+
+export type UpdateUserStatusBody = z.infer<
+  typeof updateUserStatusBodySchema
+>;
+
+
+export const updateUserRoleBodySchema = z
+  .object({
+    role: z.enum(UserRole),
+  })
+  .strict();
+
+export type UpdateUserRoleBody = z.infer<
+  typeof updateUserRoleBodySchema
+>;
+
+export const updateUserCenterAccessBodySchema = z
+  .object({
+    centerIds: z
+      .array(
+        z
+          .coerce
+          .number()
+          .int("Center ID must be an integer.")
+          .positive("Center ID must be greater than zero."),
+      )
+      .refine(
+        (values) => new Set(values).size === values.length,
+        "Duplicate center IDs are not allowed.",
+      ),
+  })
+  .strict();
+
+export type UpdateUserCenterAccessBody = z.infer<
+  typeof updateUserCenterAccessBodySchema
+>;
+
+export const updateUserProfileBodySchema = z
+  .object({
+    fullName: z
+      .string()
+      .trim()
+      .min(2, "Full name must be at least 2 characters.")
+      .max(120, "Full name must be at most 120 characters.")
+      .optional(),
+
+    email: z
+      .string()
+      .trim()
+      .email("Please provide a valid email address.")
+      .max(255, "Email must be at most 255 characters.")
+      .transform((value) => value.toLowerCase())
+      .optional(),
+  })
+  .strict()
+  .refine(
+    (body) =>
+      body.fullName !== undefined ||
+      body.email !== undefined,
+    {
+      message: "At least one profile field must be provided.",
+    },
+  );
+
+export type UpdateUserProfileBody = z.infer<
+  typeof updateUserProfileBodySchema
+>;
