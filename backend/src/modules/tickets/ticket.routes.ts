@@ -28,6 +28,7 @@ import {
   confirmTicketClosureController,
   reopenTicketController,
   cancelTicketController,
+  getEligibleTechniciansController,
 } from "./ticket.controller";
 
 import commentRouter from "../comments/comment.routes";
@@ -70,6 +71,17 @@ ticketRouter.patch(
   }),
   updateTicketController,
 );
+
+
+ticketRouter.get(
+  "/:ticketId/eligible-technicians",
+  requireAuth,
+  validateRequest({
+    params: ticketIdParamsSchema,
+  }),
+  getEligibleTechniciansController,
+);
+
 
 ticketRouter.patch(
   "/:ticketId/assignment",
@@ -133,6 +145,7 @@ ticketRouter.post(
   }),
   cancelTicketController,
 );
+
 
 
 ticketRouter.use("/:ticketId/comments", commentRouter);

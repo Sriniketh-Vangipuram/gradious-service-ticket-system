@@ -27,6 +27,8 @@ import { reopenTicketUseCase } from "./use-cases/lifecycle/reopen-ticket.use-cas
 import { cancelTicketBodySchema } from "./ticket.schemas";
 import { cancelTicketUseCase } from "./use-cases/lifecycle/cancel-ticket.use-case";
 import { createSuccessBody } from "../../common/http/api-response";
+import { getEligibleTechniciansUseCase } from "./use-cases/get-eligible-technicians.use-case";
+
 
 export async function createTicketController(
   req: Request,
@@ -403,6 +405,39 @@ export async function cancelTicketController(
     );
 
     sendSuccess(res, { ticket });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getEligibleTechniciansController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { ticketId } = getValidatedData(
+      req,
+      { params: ticketIdParamsSchema },
+      "params",
+    );
+
+    const actor = req.authUser;
+
+    if (!actor) {
+      return next(
+        new Error(
+          "Authenticated user missing after requireAuth middleware.",
+        ),
+      );
+    }
+
+    const result = await getEligibleTechniciansUseCase(
+      ticketId,
+      actor,
+    );
+
+    sendSuccess(res, result);
   } catch (error) {
     next(error);
   }
