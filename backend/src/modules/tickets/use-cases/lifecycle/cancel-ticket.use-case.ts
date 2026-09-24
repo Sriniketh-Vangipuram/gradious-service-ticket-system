@@ -1,4 +1,6 @@
 import {
+  NotificationType,
+  SlaCycleOutcome,
   TicketHistoryEvent,
   TicketStatus,
   UserRole,
@@ -12,12 +14,10 @@ import {
   assertTicketLifecycleAccess,
   getTicketLifecycleScope,
 } from "../../policies/ticket-lifecycle-access.policy";
-import {
-  NotificationType,
-} from "../../../../generated/prisma/client";
+
 import { createNotifications } from "../../../notifications/notification.service";
 import { publishToUser } from "../../../../socket/socket.server";
-
+import { getBusinessMinutesBetween } from "../../../sla/business-calendar.service";
 
 const ticketInclude = {
   requester: {
@@ -84,6 +84,8 @@ export async function cancelTicketUseCase(
 
     assertValidTicketTransition(ticket.status, TicketStatus.CANCELLED);
 
+    const cancelledAt = new Date();
+
     const updateResult = await tx.ticket.updateMany({
       where: {
         id: ticket.id,
@@ -111,6 +113,70 @@ export async function cancelTicketUseCase(
         "CONFLICT",
         "Ticket status changed before it could be cancelled. Refresh and try again.",
       );
+    }
+
+    const activeSlaCycle = await tx.ticketSlaCycle.findFirst({
+              where: {
+                ticketId: ticket.id,
+                resolvedAt: null,
+              },
+              orderBy: {
+                cycleNumber: "desc",
+              },
+              select: {
+                id: true,
+                pausedAt: true,
+              },
+            });
+
+    if (activeSlaCycle) {
+              let additionalPausedMinutes = 0;
+
+    if (activeSlaCycle.pausedAt !== null) {
+                const pausedBusinessMinutes = await getBusinessMinutesBetween({
+                  startAt: activeSlaCycle.pausedAt,
+                  endAt: cancelledAt,
+                  centerId: ticket.centerId,
+                  db: tx,
+                });
+
+                additionalPausedMinutes = Math.round(pausedBusinessMinutes);
+              }
+
+              const slaCycleUpdateResult = await tx.ticketSlaCycle.updateMany({
+                where: {
+                  id: activeSlaCycle.id,
+                  resolvedAt: null,
+                },
+                data: {
+                  resolvedAt: cancelledAt,
+                  outcome: SlaCycleOutcome.CANCELLED,
+                  pausedAt: null,
+                  ...(additionalPausedMinutes > 0
+                    ? {
+                        totalPausedMinutes: {
+                          increment: additionalPausedMinutes,
+                        },
+                      }
+                    : {}),
+                },
+              });
+
+              if (slaCycleUpdateResult.count !== 1) {
+                throw new AppError(
+                  "CONFLICT",
+                  "The SLA cycle changed before it could be cancelled. Refresh and try again.",
+                );
+              }
+
+              await tx.ticket.update({
+                where: {
+                  id: ticket.id,
+                },
+                data: {
+                  resolutionDueAt: null,
+                },
+              });
     }
 
     await tx.ticketHistory.create({

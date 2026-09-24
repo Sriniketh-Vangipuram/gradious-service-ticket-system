@@ -8,7 +8,7 @@ const allowedTransitions: Record<TicketStatus, readonly TicketStatus[]>={
     IN_PROGRESS:["WAITING_FOR_USER","RESOLVED","CANCELLED"],
     WAITING_FOR_USER:["IN_PROGRESS","CANCELLED"],
     RESOLVED:["CLOSED","IN_PROGRESS"],
-    CLOSED:["IN_PROGRESS"],
+    CLOSED:[],
     CANCELLED:[],
 };
 

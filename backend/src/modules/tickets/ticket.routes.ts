@@ -120,7 +120,7 @@ ticketRouter.patch(
   "/:ticketId/status",
   requireAuth,
   validateRequest({
-    params: updateTicketParamsSchema,
+    params: ticketIdParamsSchema,
     body: changeTicketStatusBodySchema,
   }),
   changeTicketStatusController,

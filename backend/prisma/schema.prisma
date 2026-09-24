@@ -265,6 +265,7 @@ enum TicketHistoryEvent {
   PRIORITY_CHANGED
   CATEGORY_CHANGED
   SOFTWARE_CHANGED
+  REQUEST_TYPE_CHANGED
   CENTER_CHANGED
   LAB_CHANGED
   RESOLVED
@@ -419,6 +420,7 @@ model SlaPolicy {
 enum SlaCycleOutcome {
   MET
   BREACHED
+  CANCELLED
 }
 
 model TicketSlaCycle {

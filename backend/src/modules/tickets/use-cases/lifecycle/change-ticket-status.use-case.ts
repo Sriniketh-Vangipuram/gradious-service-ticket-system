@@ -65,17 +65,17 @@ const ticketInclude = {
 
 type OrdinaryTicketStatus = Extract<
   TicketStatus,
-  "TRIAGED" | "ASSIGNED" | "IN_PROGRESS" | "WAITING_FOR_USER"
+  "IN_PROGRESS" | "WAITING_FOR_USER"
 >;
 
-const statusActionMap: Partial<
-  Record<OrdinaryTicketStatus, TicketLifecycleAction>
+const statusActionMap: Record<
+  OrdinaryTicketStatus,
+  TicketLifecycleAction
 > = {
-  TRIAGED: "TRIAGE",
-  ASSIGNED: "MARK_ASSIGNED",
   IN_PROGRESS: "START_WORK",
   WAITING_FOR_USER: "WAIT_FOR_USER",
 };
+
 
 function assertOrdinaryStatus(
   status: TicketStatus,
@@ -140,15 +140,6 @@ export async function changeTicketStatusUseCase(
     assertValidTicketTransition(ticket.status, nextStatus);
 
     // 5. ASSIGNED requires an eligible technician already assigned.
-    if (
-      nextStatus === TicketStatus.ASSIGNED &&
-      ticket.assigneeId === null
-    ) {
-      throw new AppError(
-        "CONFLICT",
-        "A ticket must have an assigned technician before it can enter ASSIGNED status.",
-      );
-    }
 
     // 6. Update status and create history atomically.
     const updateResult = await tx.ticket.updateMany({

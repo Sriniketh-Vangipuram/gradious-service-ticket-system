@@ -133,7 +133,8 @@ export async function confirmTicketClosureUseCase(
         recipientIds: [ticket.assigneeId],
         type: NotificationType.TICKET_STATUS_CHANGED,
         title: "Ticket closed",
-        message: `Ticket ${ticket.ticketNumber} was closed by the requester.`,        ticketId: ticket.id,
+        message: `Ticket ${ticket.ticketNumber} was closed by the requester.`,        
+        ticketId: ticket.id,
       });
     }
 

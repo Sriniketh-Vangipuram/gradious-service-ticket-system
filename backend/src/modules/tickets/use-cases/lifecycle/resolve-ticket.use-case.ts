@@ -108,28 +108,28 @@ export async function resolveTicketUseCase(
 
     // Guard against a concurrent status change or technician reassignment.
     const updateResult = await tx.ticket.updateMany({
-    where: {
+      where: {
         id: ticket.id,
         status: TicketStatus.IN_PROGRESS,
 
         ...(actor.role === UserRole.TECHNICIAN
-        ? { assigneeId: actor.userId }
-        : {}),
+          ? { assigneeId: actor.userId }
+          : {}),
 
         ...(actor.role === UserRole.CENTER_MANAGER
-        ? {
-            center: {
+          ? {
+              center: {
                 userAccess: {
-                some: { userId: actor.userId },
+                  some: { userId: actor.userId },
                 },
-            },
+              },
             }
-        : {}),
-    },
-    data: {
+          : {}),
+      },
+      data: {
         status: TicketStatus.RESOLVED,
         resolvedAt,
-    },
+      },
     });
 
     if (updateResult.count !== 1) {
@@ -231,6 +231,7 @@ export async function resolveTicketUseCase(
       resolvedAt: result.ticket.resolvedAt,
       updatedAt: result.ticket.updatedAt,
     });
+  }
 
     for (const notification of createdNotifications) {
       publishToUser(notification.userId, "notification:created", {
@@ -242,7 +243,6 @@ export async function resolveTicketUseCase(
         createdAt: notification.createdAt,
       });
     }
-  }
 
   return result.ticket;
 }

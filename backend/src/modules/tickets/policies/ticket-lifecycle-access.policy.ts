@@ -4,8 +4,6 @@ import { AppError } from "../../../common/errors/app-error";
 import type { AuthenticatedUser } from "../../../middleware/auth.middleware";
 
 export type TicketLifecycleAction =
-  | "TRIAGE"
-  | "MARK_ASSIGNED"
   | "START_WORK"
   | "WAIT_FOR_USER"
   | "RESUME_WORK"
@@ -13,6 +11,7 @@ export type TicketLifecycleAction =
   | "CONFIRM_CLOSURE"
   | "REOPEN"
   | "CANCEL";
+
 
 type TicketLifecycleAccessContext = {
   requesterId: number;
@@ -44,24 +43,6 @@ export function assertTicketLifecycleAccess(
     actor.userId === ticket.assigneeId;
 
   switch (action) {
-    case "TRIAGE":
-      if (
-        isAssignedTechnician ||
-        actor.role === UserRole.CENTER_MANAGER ||
-        actor.role === UserRole.ADMIN
-      ) {
-        return;
-      }
-      break;
-
-    case "MARK_ASSIGNED":
-      if (
-        actor.role === UserRole.ADMIN ||
-        actor.role === UserRole.CENTER_MANAGER
-      ) {
-        return;
-      }
-      break;
 
     case "START_WORK":
     case "WAIT_FOR_USER":
@@ -126,7 +107,7 @@ export function getTicketLifecycleScope(
       throw new AppError("FORBIDDEN", "You are not authorized to perform this ticket action.");
 
     case UserRole.TECHNICIAN:
-      if (["START_WORK", "WAIT_FOR_USER", "RESUME_WORK", "RESOLVE", "TRIAGE"].includes(action)) {
+      if (["START_WORK", "WAIT_FOR_USER", "RESUME_WORK", "RESOLVE"].includes(action)) {
         return { id: ticketId,assigneeId:actor.userId };
       }
       throw new AppError("FORBIDDEN", "You are not authorized to perform this ticket action.");
