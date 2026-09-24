@@ -10,6 +10,10 @@ import type {
   ListTicketsParams,
 } from "../types/ticket-api.types";
 
+import { getEligibleTechnicians } from "../api/ticket.api";
+
+
+
 export function useTickets(
   params?: Omit<ListTicketsParams, "cursor">,
 ) {
@@ -50,6 +54,30 @@ export function useTicket(ticketId: number | null) {
       }
 
       return getTicket(ticketId);
+    },
+
+    enabled: ticketId !== null,
+
+    staleTime: 30_000,
+  });
+}
+
+
+export function useEligibleTechnicians(
+  ticketId: number | null,
+) {
+  return useQuery({
+    queryKey:
+      ticketId === null
+        ? TICKET_QUERY_KEYS.eligibleTechnicians(0)
+        : TICKET_QUERY_KEYS.eligibleTechnicians(ticketId),
+
+    queryFn: () => {
+      if (ticketId === null) {
+        throw new Error("Ticket ID is required.");
+      }
+
+      return getEligibleTechnicians(ticketId);
     },
 
     enabled: ticketId !== null,

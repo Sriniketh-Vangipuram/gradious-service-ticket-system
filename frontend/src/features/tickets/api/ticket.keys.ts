@@ -10,4 +10,7 @@ export const TICKET_QUERY_KEYS = {
 
   detail: (ticketId: number) =>
     [...TICKET_QUERY_KEYS.details(), ticketId] as const,
+
+  eligibleTechnicians: (ticketId: number) =>
+  [...TICKET_QUERY_KEYS.detail(ticketId), "eligible-technicians"] as const,
 };

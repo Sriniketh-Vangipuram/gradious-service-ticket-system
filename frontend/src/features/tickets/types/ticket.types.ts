@@ -91,3 +91,16 @@ export interface Ticket {
   category: unknown;
   software: unknown | null;
 }
+
+
+export type TechnicianSpecialization =
+  | "SOFTWARE"
+  | "HARDWARE"
+  | "NETWORK";
+
+export interface EligibleTechnician {
+  id: number;
+  fullName: string;
+  email: string;
+  specializations: TechnicianSpecialization[];
+}

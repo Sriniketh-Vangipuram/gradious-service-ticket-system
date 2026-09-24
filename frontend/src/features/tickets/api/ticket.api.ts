@@ -19,7 +19,11 @@ import type {
   ResolveTicketResponse,
   UpdateTicketRequest,
   UpdateTicketResponse,
+  TicketSuccessResponse,
 } from "../types/ticket-api.types";
+import type { EligibleTechnician } from "../types/ticket.types";
+
+
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
@@ -186,6 +190,22 @@ export async function cancelTicket(
     `/tickets/${ticketId}/cancel`,
     payload,
   );
+
+  return response.data;
+}
+
+export type GetEligibleTechniciansResponse =
+  TicketSuccessResponse<{
+    technicians: EligibleTechnician[];
+  }>;
+
+export async function getEligibleTechnicians(
+  ticketId: number,
+): Promise<GetEligibleTechniciansResponse> {
+  const response =
+    await httpClient.get<GetEligibleTechniciansResponse>(
+      `/tickets/${ticketId}/eligible-technicians`,
+    );
 
   return response.data;
 }
