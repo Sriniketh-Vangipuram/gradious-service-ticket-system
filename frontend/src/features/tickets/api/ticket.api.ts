@@ -1,8 +1,6 @@
 import { httpClient } from "../../../lib/api/http-client";
 
 import type {
-  AssignTicketRequest,
-  AssignTicketResponse,
   CancelTicketRequest,
   CancelTicketResponse,
   ChangeTicketStatusRequest,
@@ -20,8 +18,15 @@ import type {
   UpdateTicketRequest,
   UpdateTicketResponse,
   TicketSuccessResponse,
+  AssignCenterManagerRequest,
+  AssignCenterManagerResponse,
+  AssignTechnicianRequest,
+  AssignTechnicianResponse,
+  GetEligibleManagersResponse,
 } from "../types/ticket-api.types";
 import type { EligibleTechnician } from "../types/ticket.types";
+
+
 
 
 
@@ -94,22 +99,6 @@ export async function updateTicket(
 ): Promise<UpdateTicketResponse> {
   const response = await httpClient.patch<UpdateTicketResponse>(
     `/tickets/${ticketId}`,
-    payload,
-  );
-
-  return response.data;
-}
-
-/* -------------------------------------------------------------------------- */
-/* Assignment                                                                 */
-/* -------------------------------------------------------------------------- */
-
-export async function assignTicket(
-  ticketId: number,
-  payload: AssignTicketRequest,
-): Promise<AssignTicketResponse> {
-  const response = await httpClient.patch<AssignTicketResponse>(
-    `/tickets/${ticketId}/assignment`,
     payload,
   );
 
@@ -206,6 +195,48 @@ export async function getEligibleTechnicians(
     await httpClient.get<GetEligibleTechniciansResponse>(
       `/tickets/${ticketId}/eligible-technicians`,
     );
+
+  return response.data;
+}
+
+
+
+export async function getEligibleManagers(
+  ticketId: number,
+): Promise<GetEligibleManagersResponse> {
+  const response = await httpClient.get<
+    GetEligibleManagersResponse
+  >(
+    `/tickets/${ticketId}/eligible-managers`,
+  );
+
+  return response.data;
+}
+
+export async function assignCenterManager(
+  ticketId: number,
+  payload: AssignCenterManagerRequest,
+): Promise<AssignCenterManagerResponse> {
+  const response = await httpClient.patch<
+    AssignCenterManagerResponse
+  >(
+    `/tickets/${ticketId}/manager`,
+    payload,
+  );
+
+  return response.data;
+}
+
+export async function assignTechnician(
+  ticketId: number,
+  payload: AssignTechnicianRequest,
+): Promise<AssignTechnicianResponse> {
+  const response = await httpClient.patch<
+    AssignTechnicianResponse
+  >(
+    `/tickets/${ticketId}/technician`,
+    payload,
+  );
 
   return response.data;
 }

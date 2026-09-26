@@ -6,7 +6,6 @@ import {
   MapPin,
   MessageCircle,
   RefreshCw,
-  UserRound,
 } from "lucide-react";
 
 import { Link, useLocation, useParams } from "react-router-dom";
@@ -19,6 +18,8 @@ import { useTicket } from "../hooks/useTickets";
 import { TicketComments } from "../../comments/components/TicketComments";
 import { useCurrentUser } from "../../auth/hooks/useCurrentUser";
 import { canRespondToTicket } from "../ticket.permissions";
+import { TicketAssignmentPanel } from "../components/TicketAssignmentPanel";
+
 
 interface TicketDetailsNavigationState {
   from?: string;
@@ -99,7 +100,7 @@ export function TicketDetailsPage() {
 
   const { data: currentUserResponse } = useCurrentUser();
 
-  const currentUser = currentUserResponse?.data.user;
+  const currentUser = currentUserResponse?.data.user??null;
 
   if (!isValidTicketId) {
     return (
@@ -363,48 +364,7 @@ export function TicketDetailsPage() {
             </dl>
           </article>
 
-          <article className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5">
-            <div className="flex items-center gap-2 text-slate-300">
-              <UserRound size={17} aria-hidden="true" />
-              <h2 className="text-sm font-semibold">
-                Assignment
-              </h2>
-            </div>
-
-            <dl className="mt-5 space-y-4">
-              <div>
-                <dt className="text-xs text-slate-500">
-                  Requester
-                </dt>
-
-                <dd className="mt-1 text-sm font-medium text-slate-200">
-                  {ticket.requester.fullName}
-                </dd>
-
-                <dd className="mt-1 break-all text-xs text-slate-500">
-                  {ticket.requester.email}
-                </dd>
-              </div>
-
-              <div>
-                <dt className="text-xs text-slate-500">
-                  Assigned technician
-                </dt>
-
-                <dd className="mt-1 text-sm font-medium text-slate-200">
-                  {ticket.assignee
-                    ? ticket.assignee.fullName
-                    : "Not assigned yet"}
-                </dd>
-
-                {ticket.assignee && (
-                  <dd className="mt-1 break-all text-xs text-slate-500">
-                    {ticket.assignee.email}
-                  </dd>
-                )}
-              </div>
-            </dl>
-          </article>
+          <TicketAssignmentPanel ticket={ticket} />
         </div>
 
         <article className="mt-5 rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5 sm:p-6">
@@ -520,6 +480,7 @@ export function TicketDetailsPage() {
 
         <TicketComments
           ticketId={ticket.id}
+          currentUser={currentUser}
           canRespond={
             currentUser
               ? canRespondToTicket(currentUser, ticket)

@@ -1,9 +1,19 @@
 import type { AdministrationUser } from "../types/user.types";
+
 import { UserCard } from "./UserCard";
 
 interface UserListProps {
   users: AdministrationUser[];
+
   onManageSpecializations?: (
+    user: AdministrationUser,
+  ) => void;
+
+  onEdit?: (
+    user: AdministrationUser,
+  ) => void;
+
+  onToggleStatus?: (
     user: AdministrationUser,
   ) => void;
 }
@@ -11,6 +21,8 @@ interface UserListProps {
 export function UserList({
   users,
   onManageSpecializations,
+  onEdit,
+  onToggleStatus,
 }: UserListProps) {
   if (users.length === 0) {
     return (
@@ -35,6 +47,8 @@ export function UserList({
           onManageSpecializations={
             onManageSpecializations
           }
+          onEdit={onEdit}
+          onToggleStatus={onToggleStatus}
         />
       ))}
     </div>

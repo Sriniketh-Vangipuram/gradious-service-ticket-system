@@ -1,7 +1,6 @@
 import {
   Activity,
   Bell,
-  Building2,
   ChartNoAxesCombined,
   ClipboardList,
   FolderTree,
@@ -125,15 +124,15 @@ export const navigationItems: NavigationItem[] = [
     section: "MANAGEMENT",
   },
 
-  {
-    label: "Centers",
-    description: "Manage service centers",
-    to: ROUTES.administration.centers,
-    icon: Building2,
-    roles: ["CENTER_MANAGER", "ADMIN"],
-    section: "MANAGEMENT",
-  },
 
+  {
+  label: "Centers",
+  description: "Manage service centers",
+  to: ROUTES.administration.centers,
+  icon: MonitorCog,
+  roles: ["ADMIN"],
+  section: "MANAGEMENT",
+},
   {
     label: "Labs",
     description: "Manage labs and assignments",
@@ -152,7 +151,7 @@ export const navigationItems: NavigationItem[] = [
     description: "Manage software catalog",
     to: ROUTES.administration.software,
     icon: MonitorCog,
-    roles: ["CENTER_MANAGER", "ADMIN"],
+    roles: ["ADMIN"],
     section: "SERVICE CATALOG",
   },
 
@@ -161,7 +160,7 @@ export const navigationItems: NavigationItem[] = [
     description: "Manage service categories",
     to: ROUTES.administration.categories,
     icon: FolderTree,
-    roles: ["CENTER_MANAGER", "ADMIN"],
+    roles: ["ADMIN"],
     section: "SERVICE CATALOG",
   },
 
@@ -196,8 +195,8 @@ export const navigationItems: NavigationItem[] = [
     description: "Service performance insights",
     to: ROUTES.administration.analytics,
     icon: ChartNoAxesCombined,
-    roles: ["ADMIN"],
-    section: "SYSTEM",
+    roles: ["CENTER_MANAGER","ADMIN"],
+    section: "OPERATIONS",
   },
 
   /* ---------------------------------------------------------------------- */

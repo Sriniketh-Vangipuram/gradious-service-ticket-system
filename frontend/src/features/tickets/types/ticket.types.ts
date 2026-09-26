@@ -26,6 +26,13 @@ export interface TicketRequester {
   email: string;
 }
 
+export interface TicketCenterManager {
+  id: number;
+  fullName: string;
+  email: string;
+}
+
+
 export interface TicketAssignee {
   id: number;
   fullName: string;
@@ -56,6 +63,7 @@ export interface Ticket {
   requestType: SoftwareRequestType | null;
 
   requesterId: number;
+  centerManagerId: number | null;
   assigneeId: number | null;
 
   centerId: number;
@@ -77,6 +85,7 @@ export interface Ticket {
 
   requester: TicketRequester;
   assignee: TicketAssignee | null;
+  centerManager: TicketCenterManager | null;
 
   center: TicketCenter;
   lab: TicketLab;
@@ -97,6 +106,13 @@ export type TechnicianSpecialization =
   | "SOFTWARE"
   | "HARDWARE"
   | "NETWORK";
+
+
+export interface EligibleManager {
+  id: number;
+  fullName: string;
+  email: string;
+}
 
 export interface EligibleTechnician {
   id: number;

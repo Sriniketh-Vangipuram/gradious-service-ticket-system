@@ -2,6 +2,7 @@ import type {
   Ticket,
   TicketPriority,
   TicketStatus,
+  EligibleManager,
   SoftwareRequestType,
 } from "./ticket.types";
 
@@ -96,15 +97,16 @@ export type UpdateTicketResponse =
 /* Assignment                                                                 */
 /* -------------------------------------------------------------------------- */
 
-export interface AssignTicketRequest {
-  assigneeId: number | null;
+export interface AssignCenterManagerRequest {
+  centerManagerId: number;
 }
 
-export type AssignTicketResponse =
-  TicketSuccessResponse<{
-    ticket: Ticket;
-  }>;
+export interface AssignTechnicianRequest {
+  technicianId: number;
+}
 
+
+  
 /* -------------------------------------------------------------------------- */
 /* Ordinary status change                                                     */
 /* -------------------------------------------------------------------------- */
@@ -171,4 +173,16 @@ export interface CancelTicketRequest {
 export type CancelTicketResponse =
   TicketSuccessResponse<{
     ticket: Ticket;
+  }>;
+
+
+export type AssignCenterManagerResponse =
+  TicketSuccessResponse<{ ticket: Ticket }>;
+
+export type AssignTechnicianResponse =
+  TicketSuccessResponse<{ ticket: Ticket }>;
+
+export type GetEligibleManagersResponse =
+  TicketSuccessResponse<{
+    managers: EligibleManager[];
   }>;

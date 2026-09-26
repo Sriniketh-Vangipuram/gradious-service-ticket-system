@@ -3,16 +3,22 @@ export type UserRole =
 | "TECHNICIAN"
 | "CENTER_MANAGER"
 | "ADMIN";
-
-export interface AuthUser {
-    id:number;
-    fullName:string;
-    email:string;
-    role:UserRole;
-    centerId:number | null;
-    labId:number | null;
+export interface AuthorizedCenter {
+  id: number;
+  name: string;
+  code: string;
 }
 
-export interface CurrentUser extends AuthUser{
-    isActive: boolean;
+export interface AuthUser {
+  id: number;
+  fullName: string;
+  email: string;
+  role: UserRole;
+  centerId: number | null;
+  labId: number | null;
+}
+
+export interface CurrentUser extends AuthUser {
+  isActive: boolean;
+  authorizedCenters: AuthorizedCenter[];
 }

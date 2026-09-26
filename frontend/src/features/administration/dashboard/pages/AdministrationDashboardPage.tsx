@@ -42,6 +42,7 @@ const administrationAreas = [
       "Manage service centers and the organizational structure supporting service delivery.",
     icon: Building2,
     iconClassName: "bg-sky-500/10 text-sky-300",
+    to:ROUTES.administration.centers,
   },
   {
     title: "Labs",

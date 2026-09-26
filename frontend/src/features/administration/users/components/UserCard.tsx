@@ -1,7 +1,9 @@
 import {
+  Edit3,
   Mail,
   MapPin,
   MonitorCog,
+  Power,
   TicketCheck,
 } from "lucide-react";
 
@@ -9,12 +11,19 @@ import type { AdministrationUser } from "../types/user.types";
 
 interface UserCardProps {
   user: AdministrationUser;
+
   onManageSpecializations?: (
     user: AdministrationUser,
   ) => void;
+
+  onEdit?: (
+    user: AdministrationUser,
+  ) => void;
+
+  onToggleStatus?: (
+    user: AdministrationUser,
+  ) => void;
 }
-
-
 
 const ROLE_LABELS: Record<
   AdministrationUser["role"],
@@ -38,15 +47,14 @@ const SPECIALIZATION_LABELS: Record<
 export function UserCard({
   user,
   onManageSpecializations,
+  onEdit,
+  onToggleStatus,
 }: UserCardProps) {
   const isTechnician = user.role === "TECHNICIAN";
 
   return (
     <article className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 transition hover:border-slate-700">
-      {/* ---------------------------------------------------------------- */}
-      {/* Header                                                           */}
-      {/* ---------------------------------------------------------------- */}
-
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h3 className="truncate text-base font-semibold text-white">
@@ -69,24 +77,20 @@ export function UserCard({
               : "bg-slate-700/60 text-slate-400"
           }`}
         >
-          {user.isActive ? "Active" : "Inactive"}
+          {user.isActive
+            ? "Active"
+            : "Inactive"}
         </span>
       </div>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* Role                                                             */}
-      {/* ---------------------------------------------------------------- */}
-
+      {/* Role */}
       <div className="mt-4">
         <span className="inline-flex rounded-md border border-slate-700 bg-slate-950 px-2.5 py-1 text-xs font-medium text-slate-300">
           {ROLE_LABELS[user.role]}
         </span>
       </div>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* Operational information                                          */}
-      {/* ---------------------------------------------------------------- */}
-
+      {/* Details */}
       <div className="mt-5 space-y-3 border-t border-slate-800 pt-4">
         <div className="flex items-start gap-3">
           <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
@@ -135,10 +139,7 @@ export function UserCard({
         </div>
       </div>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* Specializations                                                  */}
-      {/* ---------------------------------------------------------------- */}
-
+      {/* Technician specializations */}
       {isTechnician && (
         <div className="mt-5 border-t border-slate-800 pt-4">
           <div className="flex items-center justify-between gap-3">
@@ -183,6 +184,38 @@ export function UserCard({
           </div>
         </div>
       )}
+
+      {/* Actions */}
+      <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-800 pt-4">
+        {onEdit && (
+          <button
+            type="button"
+            onClick={() => onEdit(user)}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-slate-600 hover:bg-slate-800 hover:text-white"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            Edit
+          </button>
+        )}
+
+        {onToggleStatus && (
+          <button
+            type="button"
+            onClick={() => onToggleStatus(user)}
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition ${
+              user.isActive
+                ? "border-red-900/60 bg-red-950/20 text-red-400 hover:bg-red-950/40"
+                : "border-emerald-900/60 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-950/40"
+            }`}
+          >
+            <Power className="h-3.5 w-3.5" />
+
+            {user.isActive
+              ? "Deactivate"
+              : "Reactivate"}
+          </button>
+        )}
+      </div>
     </article>
   );
 }
