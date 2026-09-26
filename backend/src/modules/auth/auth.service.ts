@@ -421,7 +421,7 @@ export async function logout(rawRefreshToken?: string): Promise<void> {
 export async function getCurrentUser(userId: number) {
   const user = await prisma.user.findUnique({
     where: {
-      id: userId
+      id: userId,
     },
     select: {
       id: true,
@@ -429,14 +429,46 @@ export async function getCurrentUser(userId: number) {
       email: true,
       role: true,
       centerId: true,
-      labId:true,
-      isActive: true
-    }
+      labId: true,
+      isActive: true,
+
+      centerAccess: {
+        select: {
+          center: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
+        },
+        orderBy: {
+          center: {
+            name: "asc",
+          },
+        },
+      },
+    },
   });
 
   if (!user || !user.isActive) {
-    throw new AuthError("User account is unavailable", 401);
+    throw new AuthError(
+      "User account is unavailable",
+      401,
+    );
   }
 
-  return user;
+  return {
+    id: user.id,
+    fullName: user.fullName,
+    email: user.email,
+    role: user.role,
+    centerId: user.centerId,
+    labId: user.labId,
+    isActive: user.isActive,
+
+    authorizedCenters: user.centerAccess.map(
+      ({ center }) => center,
+    ),
+  };
 }

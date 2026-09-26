@@ -12,6 +12,9 @@ import {
   updateUserStatusBodySchema,
   updateUserCenterAccessBodySchema,
   updateUserProfileBodySchema,
+  createUserBodySchema,
+  updateUserPrimaryCenterBodySchema,
+  updateUserRoleBodySchema,
 } from "./user.schemas";
 
 import { 
@@ -21,6 +24,9 @@ import {
   updateUserStatusController,
   updateUserCenterAccessController,
   updateUserProfileController,
+  createUserController,
+  updateUserPrimaryCenterController,
+  updateUserRoleController,
 } from "./user.controller";
 
 const userRouter = Router();
@@ -36,6 +42,39 @@ userRouter.get(
     query: listUsersQuerySchema,
   }),
   listUsersController,
+);
+
+userRouter.post(
+  "/",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  validateRequest({
+    body: createUserBodySchema,
+  }),
+  createUserController,
+);
+
+
+userRouter.patch(
+  "/:userId/role",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  validateRequest({
+    params: userIdParamsSchema,
+    body: updateUserRoleBodySchema,
+  }),
+  updateUserRoleController,
+);
+
+userRouter.patch(
+  "/:userId/primary-center",
+  requireAuth,
+  requireRole(UserRole.ADMIN),
+  validateRequest({
+    params: userIdParamsSchema,
+    body: updateUserPrimaryCenterBodySchema,
+  }),
+  updateUserPrimaryCenterController,
 );
 
 userRouter.get(

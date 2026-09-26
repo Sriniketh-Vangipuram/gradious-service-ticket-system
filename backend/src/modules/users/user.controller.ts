@@ -10,6 +10,8 @@ import {
   updateUserRoleBodySchema,
   updateUserCenterAccessBodySchema,
   updateUserProfileBodySchema,
+  createUserBodySchema,
+  updateUserPrimaryCenterBodySchema,
  } from "./user.schemas";
 
 import { 
@@ -20,7 +22,52 @@ import {
   updateUserRoleUseCase,
   updateUserCenterAccessUseCase,
   updateUserProfileUseCase,
+  createUserUseCase,
+  updateUserPrimaryCenterUseCase,
  } from "./user.use-case";
+
+
+
+export async function createUserController(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const authUser = req.authUser;
+
+  if (!authUser) {
+    res.status(401).json({
+      error: {
+        code: "UNAUTHENTICATED",
+        message: "Authentication is required.",
+      },
+    });
+
+    return;
+  }
+
+  const body = getValidatedData(
+    req,
+    {
+      body: createUserBodySchema,
+    },
+    "body",
+  );
+
+  const user = await createUserUseCase(
+    body,
+    {
+      userId: authUser.userId,
+      role: authUser.role,
+    },
+  );
+
+  res.status(201).json({
+    success: true,
+    data: {
+      user,
+    },
+  });
+}
 
 export async function listUsersController(
   req: Request,
@@ -329,6 +376,54 @@ export async function updateUserProfileController(
   const result = await updateUserProfileUseCase(
     params.userId,
     body,
+    {
+      userId: authUser.userId,
+      role: authUser.role,
+    },
+  );
+
+  res.status(200).json({
+    success: true,
+    data: result,
+  });
+}
+
+export async function updateUserPrimaryCenterController(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const authUser = req.authUser;
+
+  if (!authUser) {
+    res.status(401).json({
+      error: {
+        code: "UNAUTHENTICATED",
+        message: "Authentication is required.",
+      },
+    });
+
+    return;
+  }
+
+  const params = getValidatedData(
+    req,
+    {
+      params: userIdParamsSchema,
+    },
+    "params",
+  );
+
+  const body = getValidatedData(
+    req,
+    {
+      body: updateUserPrimaryCenterBodySchema,
+    },
+    "body",
+  );
+
+  const result = await updateUserPrimaryCenterUseCase(
+    params.userId,
+    body.centerId,
     {
       userId: authUser.userId,
       role: authUser.role,

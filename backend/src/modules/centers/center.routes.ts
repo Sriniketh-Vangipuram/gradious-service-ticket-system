@@ -24,10 +24,17 @@ const centerRouter = Router();
 
 /**
  * Read centers
+ *
+ * ADMIN:
+ *   Can view all centers.
+ *
+ * CENTER_MANAGER:
+ *   Can only view centers assigned through UserCenter.
  */
 centerRouter.get(
   "/",
   requireAuth,
+  requireRole("ADMIN", "CENTER_MANAGER"),
   validateRequest({
     query: listCentersQuerySchema,
   }),
@@ -37,6 +44,7 @@ centerRouter.get(
 centerRouter.get(
   "/:centerId",
   requireAuth,
+  requireRole("ADMIN", "CENTER_MANAGER"),
   validateRequest({
     params: centerIdParamSchema,
   }),
@@ -45,6 +53,8 @@ centerRouter.get(
 
 /**
  * Create center
+ *
+ * ADMIN only.
  */
 centerRouter.post(
   "/",
@@ -58,6 +68,8 @@ centerRouter.post(
 
 /**
  * Update center
+ *
+ * ADMIN only.
  */
 centerRouter.patch(
   "/:centerId",
@@ -72,6 +84,8 @@ centerRouter.patch(
 
 /**
  * Activate / deactivate center
+ *
+ * ADMIN only.
  */
 centerRouter.patch(
   "/:centerId/status",

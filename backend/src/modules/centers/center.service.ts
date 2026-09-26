@@ -9,24 +9,62 @@ import type {
 } from "./center.schema";
 import { createAuditLog } from "../audit/audit.service";
 
+type CenterReadRole = "ADMIN" | "CENTER_MANAGER";
 
-const normalizeCenterCode = (code: string) => code.trim().toUpperCase();
+const normalizeCenterCode = (code: string) =>
+  code.trim().toUpperCase();
 
 const handlePrismaUniqueError = (error: unknown): never => {
   if (
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === "P2002"
   ) {
-    throw new Error("A center with the same name or code already exists.");
+    throw new Error(
+      "A center with the same name or code already exists.",
+    );
   }
 
   throw error;
 };
 
-export const listCenters = async (query: ListCentersQuery) => {
+/**
+ * Builds the authorization scope for center reads.
+ *
+ * ADMIN:
+ *   Can access every center.
+ *
+ * CENTER_MANAGER:
+ *   Can only access centers explicitly assigned through UserCenter.
+ *
+ * The backend remains the source of truth for this scope.
+ */
+const buildCenterReadScope = (
+  role: CenterReadRole,
+  userId: number,
+): Prisma.CenterWhereInput => {
+  if (role === "ADMIN") {
+    return {};
+  }
+
+  return {
+    userAccess: {
+      some: {
+        userId,
+      },
+    },
+  };
+};
+
+export const listCenters = async (
+  query: ListCentersQuery,
+  role: CenterReadRole,
+  userId: number,
+) => {
   const { search, isActive, page, limit } = query;
 
-  const where: Prisma.CenterWhereInput = {};
+  const where: Prisma.CenterWhereInput = {
+    ...buildCenterReadScope(role, userId),
+  };
 
   if (isActive !== undefined) {
     where.isActive = isActive;
@@ -91,10 +129,21 @@ export const listCenters = async (query: ListCentersQuery) => {
   };
 };
 
-export const getCenterById = async (centerId: number) => {
-  const center = await prisma.center.findUnique({
+export const getCenterById = async (
+  centerId: number,
+  role: CenterReadRole,
+  userId: number,
+) => {
+  const scope = buildCenterReadScope(role, userId);
+
+  const center = await prisma.center.findFirst({
     where: {
-      id: centerId,
+      AND: [
+        {
+          id: centerId,
+        },
+        scope,
+      ],
     },
     select: {
       id: true,
@@ -135,55 +184,58 @@ export const getCenterById = async (centerId: number) => {
   return center;
 };
 
-export const createCenter = async (body: CreateCenterBody,actorId:number) => {
+export const createCenter = async (
+  body: CreateCenterBody,
+  actorId: number,
+) => {
   const name = body.name.trim();
   const code = normalizeCenterCode(body.code);
 
- try {
-  return await prisma.$transaction(async (tx) => {
-    const center = await tx.center.create({
-      data: {
-        name,
-        code,
-        isActive: true,
-      },
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    await createAuditLog(
-      {
-        action: "CENTER_CREATED",
-        entityType: "CENTER",
-        entityId: String(center.id),
-        actorId,
-
-        newValue: {
-          name: center.name,
-          code: center.code,
-          isActive: center.isActive,
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const center = await tx.center.create({
+        data: {
+          name,
+          code,
+          isActive: true,
         },
-      },
-      tx,
-    );
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
 
-    return center;
-  });
-} catch (error) {
-  handlePrismaUniqueError(error);
-}
-}
+      await createAuditLog(
+        {
+          action: "CENTER_CREATED",
+          entityType: "CENTER",
+          entityId: String(center.id),
+          actorId,
+
+          newValue: {
+            name: center.name,
+            code: center.code,
+            isActive: center.isActive,
+          },
+        },
+        tx,
+      );
+
+      return center;
+    });
+  } catch (error) {
+    handlePrismaUniqueError(error);
+  }
+};
 
 export const updateCenter = async (
   centerId: number,
   body: UpdateCenterBody,
-  actorId:number,
+  actorId: number,
 ) => {
   const existingCenter = await prisma.center.findUnique({
     where: {
@@ -212,55 +264,55 @@ export const updateCenter = async (
   }
 
   try {
-  return await prisma.$transaction(async (tx) => {
-    const updatedCenter = await tx.center.update({
-      where: {
-        id: centerId,
-      },
-      data,
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    return await prisma.$transaction(async (tx) => {
+      const updatedCenter = await tx.center.update({
+        where: {
+          id: centerId,
+        },
+        data,
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      await createAuditLog(
+        {
+          action: "CENTER_UPDATED",
+          entityType: "CENTER",
+          entityId: String(centerId),
+          actorId,
+
+          oldValue: {
+            name: existingCenter.name,
+            code: existingCenter.code,
+            isActive: existingCenter.isActive,
+          },
+
+          newValue: {
+            name: updatedCenter.name,
+            code: updatedCenter.code,
+            isActive: updatedCenter.isActive,
+          },
+        },
+        tx,
+      );
+
+      return updatedCenter;
     });
-
-    await createAuditLog(
-      {
-        action: "CENTER_UPDATED",
-        entityType: "CENTER",
-        entityId: String(centerId),
-        actorId,
-
-        oldValue: {
-          name: existingCenter.name,
-          code: existingCenter.code,
-          isActive: existingCenter.isActive,
-        },
-
-        newValue: {
-          name: updatedCenter.name,
-          code: updatedCenter.code,
-          isActive: updatedCenter.isActive,
-        },
-      },
-      tx,
-    );
-
-    return updatedCenter;
-  });
-} catch (error) {
-  handlePrismaUniqueError(error);
-}
-}
+  } catch (error) {
+    handlePrismaUniqueError(error);
+  }
+};
 
 export const updateCenterStatus = async (
   centerId: number,
   body: UpdateCenterStatusBody,
-  actorId:number,
+  actorId: number,
 ) => {
   const existingCenter = await prisma.center.findUnique({
     where: {
@@ -293,45 +345,45 @@ export const updateCenterStatus = async (
    * an inactive center.
    */
   return prisma.$transaction(async (tx) => {
-  const updatedCenter = await tx.center.update({
-    where: {
-      id: centerId,
-    },
-    data: {
-      isActive: body.isActive,
-    },
-    select: {
-      id: true,
-      name: true,
-      code: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    const updatedCenter = await tx.center.update({
+      where: {
+        id: centerId,
+      },
+      data: {
+        isActive: body.isActive,
+      },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    await createAuditLog(
+      {
+        action: "CENTER_UPDATED",
+        entityType: "CENTER",
+        entityId: String(centerId),
+        actorId,
+
+        oldValue: {
+          isActive: existingCenter.isActive,
+        },
+
+        newValue: {
+          isActive: updatedCenter.isActive,
+        },
+
+        metadata: {
+          operation: "STATUS_CHANGE",
+        },
+      },
+      tx,
+    );
+
+    return updatedCenter;
   });
-
-  await createAuditLog(
-    {
-      action: "CENTER_UPDATED",
-      entityType: "CENTER",
-      entityId: String(centerId),
-      actorId,
-
-      oldValue: {
-        isActive: existingCenter.isActive,
-      },
-
-      newValue: {
-        isActive: updatedCenter.isActive,
-      },
-
-      metadata: {
-        operation: "STATUS_CHANGE",
-      },
-    },
-    tx,
-  );
-
-  return updatedCenter;
-});
-}
+};

@@ -19,6 +19,14 @@ import {
   updateCenterStatus,
 } from "./center.service";
 
+type CenterReadRole = "ADMIN" | "CENTER_MANAGER";
+
+const isCenterReadRole = (
+  role: string,
+): role is CenterReadRole => {
+  return role === "ADMIN" || role === "CENTER_MANAGER";
+};
+
 export async function listCentersController(
   req: Request,
   res: Response,
@@ -33,7 +41,23 @@ export async function listCentersController(
       "query",
     );
 
-    const result = await listCenters(query);
+    const authUser = req.authUser!;
+
+    if (!isCenterReadRole(authUser.role)) {
+      res.status(403).json({
+        error: {
+          code: "FORBIDDEN",
+          message: "You do not have permission to access centers.",
+        },
+      });
+      return;
+    }
+
+    const result = await listCenters(
+      query,
+      authUser.role,
+      authUser.userId,
+    );
 
     sendSuccess(res, result);
   } catch (error) {
@@ -55,7 +79,23 @@ export async function getCenterController(
       "params",
     );
 
-    const center = await getCenterById(centerId);
+    const authUser = req.authUser!;
+
+    if (!isCenterReadRole(authUser.role)) {
+      res.status(403).json({
+        error: {
+          code: "FORBIDDEN",
+          message: "You do not have permission to access centers.",
+        },
+      });
+      return;
+    }
+
+    const center = await getCenterById(
+      centerId,
+      authUser.role,
+      authUser.userId,
+    );
 
     sendSuccess(res, {
       center,
@@ -79,7 +119,10 @@ export async function createCenterController(
       "body",
     );
 
-    const center = await createCenter(body,req.authUser!.userId);
+    const center = await createCenter(
+      body,
+      req.authUser!.userId,
+    );
 
     sendSuccess(
       res,
@@ -118,7 +161,7 @@ export async function updateCenterController(
     const center = await updateCenter(
       centerId,
       body,
-      req.authUser!.userId
+      req.authUser!.userId,
     );
 
     sendSuccess(res, {
@@ -154,7 +197,7 @@ export async function updateCenterStatusController(
     const center = await updateCenterStatus(
       centerId,
       body,
-      req.authUser!.userId
+      req.authUser!.userId,
     );
 
     sendSuccess(res, {

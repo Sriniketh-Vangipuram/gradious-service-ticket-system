@@ -141,3 +141,56 @@ export const updateUserProfileBodySchema = z
 export type UpdateUserProfileBody = z.infer<
   typeof updateUserProfileBodySchema
 >;
+
+export const createUserBodySchema = z
+  .object({
+    fullName: z
+      .string()
+      .trim()
+      .min(2, "Full name must be at least 2 characters.")
+      .max(120, "Full name must be at most 120 characters."),
+
+    email: z
+      .string()
+      .trim()
+      .email("Please provide a valid email address.")
+      .max(255, "Email must be at most 255 characters.")
+      .transform((value) => value.toLowerCase()),
+
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters.")
+      .max(128, "Password must be at most 128 characters."),
+
+    role: z.enum(UserRole),
+
+    primaryCenterId: z
+      .coerce
+      .number()
+      .int("Primary center ID must be an integer.")
+      .positive("Primary center ID must be greater than zero.")
+      .optional(),
+  })
+  .strict();
+
+export type CreateUserBody = z.infer<
+  typeof createUserBodySchema
+>;
+
+export const updateUserPrimaryCenterBodySchema =
+  z
+    .object({
+      centerId: z
+        .coerce
+        .number()
+        .int("Center ID must be an integer.")
+        .positive(
+          "Center ID must be greater than zero.",
+        ),
+    })
+    .strict();
+
+export type UpdateUserPrimaryCenterBody =
+  z.infer<
+    typeof updateUserPrimaryCenterBodySchema
+  >;
