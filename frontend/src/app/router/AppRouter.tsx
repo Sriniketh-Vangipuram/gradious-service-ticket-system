@@ -30,6 +30,7 @@ import { CategoriesPage } from "../../features/administration/categories/pages/C
 import { useCurrentUser } from "../../features/auth/hooks/useCurrentUser";
 import { SoftwarePage } from "../../features/administration/software/pages/SoftwarePage";
 import SlaMonitoringPage from "../../features/administration/sla/pages/SlaMonitoringPage";
+import { AnalyticsPage } from "../../features/administration/analytics/pages/AnalyticsPage";
 
 function NotFoundPlaceholder() {
   return <div className="p-8">Page not found</div>;
@@ -182,6 +183,11 @@ export function AppRouter() {
           <Route
             path={ROUTES.administration.sla}
             element={<SlaMonitoringPage/>}
+          />
+
+          <Route
+            path={ROUTES.administration.analytics}
+            element={<AnalyticsPage/>}
           />
         </Route>
       </Route>
