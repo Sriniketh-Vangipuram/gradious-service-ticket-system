@@ -1,8 +1,12 @@
-import type { Request, Response, NextFunction } from "express";
-
+import type {
+  Request,
+  Response,
+  NextFunction,
+} from "express";
+import type { LabReadRole } from "./lab.service";
 import { getValidatedData } from "../../common/validation/validate-request";
 import { sendSuccess } from "../../common/http/api-response";
-
+import type { UserRole } from "../../generated/prisma/client";
 import {
   labIdParamSchema,
   listLabsQuerySchema,
@@ -19,6 +23,24 @@ import {
   updateLabStatus,
 } from "./lab.service";
 
+
+
+const getLabReadRole = (
+  role: UserRole,
+): LabReadRole => {
+  if (
+    role === "ADMIN" ||
+    role === "CENTER_MANAGER"
+  ) {
+    return role;
+  }
+
+  throw new Error(
+    "Invalid role for lab access.",
+  );
+};
+
+
 export async function listLabsController(
   req: Request,
   res: Response,
@@ -33,7 +55,13 @@ export async function listLabsController(
       "query",
     );
 
-    const result = await listLabs(query);
+    const authUser = req.authUser!;
+
+    const result = await listLabs(
+      query,
+      getLabReadRole(authUser.role),
+      authUser.userId,
+    );
 
     sendSuccess(res, result);
   } catch (error) {
@@ -55,7 +83,13 @@ export async function getLabController(
       "params",
     );
 
-    const lab = await getLabById(labId);
+    const authUser = req.authUser!;
+
+    const lab = await getLabById(
+      labId,
+      getLabReadRole(authUser.role),
+      authUser.userId,
+    );
 
     sendSuccess(res, {
       lab,
@@ -79,7 +113,10 @@ export async function createLabController(
       "body",
     );
 
-    const lab = await createLab(body,req.authUser!.userId);
+    const lab = await createLab(
+      body,
+      req.authUser!.userId,
+    );
 
     sendSuccess(
       res,
@@ -118,7 +155,7 @@ export async function updateLabController(
     const lab = await updateLab(
       labId,
       body,
-      req.authUser!.userId
+      req.authUser!.userId,
     );
 
     sendSuccess(res, {
@@ -154,7 +191,7 @@ export async function updateLabStatusController(
     const lab = await updateLabStatus(
       labId,
       body,
-      req.authUser!.userId
+      req.authUser!.userId,
     );
 
     sendSuccess(res, {

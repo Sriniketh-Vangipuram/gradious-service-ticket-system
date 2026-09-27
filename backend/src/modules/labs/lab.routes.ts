@@ -3,6 +3,7 @@ import { Router } from "express";
 import { requireAuth } from "../../middleware/auth.middleware";
 import { requireRole } from "../../middleware/role.middleware";
 import { validateRequest } from "../../common/validation/validate-request";
+import { UserRole } from "../../generated/prisma/client";
 
 import {
   labIdParamSchema,
@@ -28,6 +29,10 @@ const labRouter = Router();
 labRouter.get(
   "/",
   requireAuth,
+  requireRole(
+    UserRole.ADMIN,
+    UserRole.CENTER_MANAGER,
+  ),
   validateRequest({
     query: listLabsQuerySchema,
   }),
@@ -37,6 +42,10 @@ labRouter.get(
 labRouter.get(
   "/:labId",
   requireAuth,
+  requireRole(
+    UserRole.ADMIN,
+    UserRole.CENTER_MANAGER,
+  ),
   validateRequest({
     params: labIdParamSchema,
   }),
@@ -49,7 +58,7 @@ labRouter.get(
 labRouter.post(
   "/",
   requireAuth,
-  requireRole("ADMIN"),
+  requireRole(UserRole.ADMIN),
   validateRequest({
     body: createLabBodySchema,
   }),
@@ -62,7 +71,7 @@ labRouter.post(
 labRouter.patch(
   "/:labId",
   requireAuth,
-  requireRole("ADMIN"),
+  requireRole(UserRole.ADMIN),
   validateRequest({
     params: labIdParamSchema,
     body: updateLabBodySchema,
@@ -76,7 +85,7 @@ labRouter.patch(
 labRouter.patch(
   "/:labId/status",
   requireAuth,
-  requireRole("ADMIN"),
+  requireRole(UserRole.ADMIN),
   validateRequest({
     params: labIdParamSchema,
     body: updateLabStatusBodySchema,
