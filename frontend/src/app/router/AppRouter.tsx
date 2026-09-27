@@ -22,6 +22,9 @@ import { AdministrationDashboardPage } from "../../features/administration/dashb
 import { AdministrationTicketsPage } from "../../features/administration/tickets/pages/AdministrationTicketsPage";
 import AdministrationUsersPage from "../../features/administration/users/pages/AdministrationUsersPage";
 import { AdministrationCentersPage } from "../../features/administration/centers/pages/AdministrationCentersPage";
+import LabsPage from "../../features/administration/labs/pages/LabsPage";
+
+
 
 import { useCurrentUser } from "../../features/auth/hooks/useCurrentUser";
 
@@ -156,6 +159,11 @@ export function AppRouter() {
           <Route
             path={ROUTES.administration.centers}
             element={<AdministrationCentersPage />}
+          />
+
+          <Route 
+            path={ROUTES.administration.labs}
+            element={<LabsPage/>}
           />
         </Route>
       </Route>
