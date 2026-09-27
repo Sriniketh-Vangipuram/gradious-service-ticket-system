@@ -12,7 +12,7 @@ interface RetryableRequestConfig
 }
 
 export const httpClient = axios.create({
-  baseURL: "/api/v1",
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/api/v1`,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
