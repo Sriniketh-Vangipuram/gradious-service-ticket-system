@@ -99,9 +99,9 @@ export async function getTicketTrends(
   const where = buildTicketWhere(query);
 
   const conditions: Prisma.Sql[] = [
-    Prisma.sql`"createdAt" >= ${query.from}`,
-    Prisma.sql`"createdAt" <= ${query.to}`,
-  ];
+  Prisma.sql`\`createdAt\` >= ${query.from}`,
+  Prisma.sql`\`createdAt\` <= ${query.to}`,
+];
 
   if (where.centerId !== undefined) {
     if (typeof where.centerId === "number") {
@@ -135,26 +135,25 @@ export async function getTicketTrends(
   let dateExpression: Prisma.Sql;
 
   switch (query.granularity) {
-    case "month":
-      dateExpression = Prisma.sql`
-        DATE_FORMAT(createdAt, '%Y-%m')
-      `;
-      break;
+  case "month":
+    dateExpression = Prisma.sql`
+      DATE_FORMAT(\`createdAt\`, '%Y-%m')
+    `;
+    break;
 
-    case "week":
-      dateExpression = Prisma.sql`
-        DATE_FORMAT(createdAt, '%x-W%v')
-      `;
-      break;
+  case "week":
+    dateExpression = Prisma.sql`
+      DATE_FORMAT(\`createdAt\`, '%x-W%v')
+    `;
+    break;
 
-    case "day":
-    default:
-      dateExpression = Prisma.sql`
-        DATE_FORMAT(createdAt, '%Y-%m-%d')
-      `;
-      break;
-  }
-
+  case "day":
+  default:
+    dateExpression = Prisma.sql`
+      DATE_FORMAT(\`createdAt\`, '%Y-%m-%d')
+    `;
+    break;
+}
   const result = await prisma.$queryRaw<
     Array<{
       period: string;

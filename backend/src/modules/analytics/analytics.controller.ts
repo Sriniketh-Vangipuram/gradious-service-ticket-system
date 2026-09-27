@@ -32,6 +32,12 @@ async function buildAnalyticsQuery(
     query: schema,
   }, "query");
 
+  const from = new Date(filters.from);
+  from.setHours(0, 0, 0, 0);
+
+  const to = new Date(filters.to);
+  to.setHours(23, 59, 59, 999);
+
   const authUser = req.authUser;
 
   if (!authUser) {
@@ -44,6 +50,8 @@ async function buildAnalyticsQuery(
   if (authUser.role === "ADMIN") {
     return {
       ...filters,
+      from,
+      to,
       scope: {
         userId: authUser.userId,
         role: "ADMIN",
@@ -73,6 +81,8 @@ async function buildAnalyticsQuery(
 
   return {
     ...filters,
+    from,
+    to,
     scope: {
       userId: authUser.userId,
       role: "CENTER_MANAGER",
