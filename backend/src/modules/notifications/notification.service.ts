@@ -6,8 +6,6 @@ import {
 
 type NotificationDatabase = PrismaClient | Prisma.TransactionClient;
 
-type NotificationTransaction = Prisma.TransactionClient;
-
 type CreateNotificationsInput = {
   recipientIds: number[];
   type: NotificationType;
