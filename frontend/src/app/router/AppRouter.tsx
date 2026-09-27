@@ -31,6 +31,7 @@ import { useCurrentUser } from "../../features/auth/hooks/useCurrentUser";
 import { SoftwarePage } from "../../features/administration/software/pages/SoftwarePage";
 import SlaMonitoringPage from "../../features/administration/sla/pages/SlaMonitoringPage";
 import { AnalyticsPage } from "../../features/administration/analytics/pages/AnalyticsPage";
+import { HomePage } from "../../features/home/pages/HomePage";
 
 function NotFoundPlaceholder() {
   return <div className="p-8">Page not found</div>;
@@ -78,6 +79,11 @@ export function AppRouter() {
     <Routes>
       {/* Public routes */}
       <Route element={<PublicLayout />}>
+
+        <Route
+          path={ROUTES.home}
+          element={<HomePage/>}
+        />
         <Route
           path={ROUTES.login}
           element={<LoginPage />}

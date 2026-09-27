@@ -1,7 +1,10 @@
 import {
   NotificationType,
   Prisma,
+  PrismaClient,
 } from "../../generated/prisma/client";
+
+type NotificationDatabase = PrismaClient | Prisma.TransactionClient;
 
 type NotificationTransaction = Prisma.TransactionClient;
 
@@ -16,7 +19,7 @@ type CreateNotificationsInput = {
 
 
 export async function createNotifications(
-  tx: NotificationTransaction,
+  tx: NotificationDatabase,
   input: CreateNotificationsInput,
 ) {
   const recipientIds = [...new Set(input.recipientIds)];

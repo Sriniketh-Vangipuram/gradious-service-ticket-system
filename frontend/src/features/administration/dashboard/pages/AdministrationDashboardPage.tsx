@@ -11,7 +11,6 @@ import {
 import { Link } from "react-router-dom";
 import { ROUTES } from "../../../../constants/routes";
 
-
 const administrationAreas = [
   {
     title: "Ticket Operations",
@@ -28,29 +27,36 @@ const administrationAreas = [
       "Monitor service-level commitments, approaching deadlines, and breached targets.",
     icon: Clock3,
     iconClassName: "bg-amber-500/10 text-amber-300",
+    to: ROUTES.administration.sla,
   },
+
   {
     title: "Service Health",
     description:
       "Understand operational workload, service activity, and overall support performance.",
     icon: BarChart3,
     iconClassName: "bg-emerald-500/10 text-emerald-300",
+    to: ROUTES.administration.analytics,
   },
+
   {
     title: "Centers",
     description:
       "Manage service centers and the organizational structure supporting service delivery.",
     icon: Building2,
     iconClassName: "bg-sky-500/10 text-sky-300",
-    to:ROUTES.administration.centers,
+    to: ROUTES.administration.centers,
   },
+
   {
     title: "Labs",
     description:
       "Manage labs, their center relationships, and service locations.",
     icon: Layers3,
     iconClassName: "bg-violet-500/10 text-violet-300",
+    to: ROUTES.administration.labs,
   },
+
   {
     title: "Users",
     description:
@@ -59,33 +65,41 @@ const administrationAreas = [
     iconClassName: "bg-cyan-500/10 text-cyan-300",
     to: ROUTES.administration.users,
   },
+
   {
     title: "Software Catalog",
     description:
       "Maintain the software catalog used across installation and support requests.",
     icon: Package,
     iconClassName: "bg-fuchsia-500/10 text-fuchsia-300",
+    to: ROUTES.administration.software,
   },
+
   {
     title: "Categories",
     description:
       "Maintain service categories used to classify and organize tickets.",
     icon: Layers3,
     iconClassName: "bg-orange-500/10 text-orange-300",
+    to: ROUTES.administration.categories,
   },
+
   {
     title: "Audit Logs",
     description:
       "Review important administrative and system activity for operational traceability.",
     icon: FileSearch,
     iconClassName: "bg-rose-500/10 text-rose-300",
+    to: ROUTES.administration.auditLogs,
   },
+
   {
     title: "Analytics",
     description:
       "Analyze service volume, resolution patterns, SLA performance, and operational trends.",
     icon: BarChart3,
     iconClassName: "bg-blue-500/10 text-blue-300",
+    to: ROUTES.administration.analytics,
   },
 ];
 
@@ -109,6 +123,7 @@ export function AdministrationDashboardPage() {
       </header>
 
       <div className="mt-8 space-y-8">
+        {/* Operations */}
         <section aria-labelledby="operations-heading">
           <div className="mb-4">
             <h2
@@ -127,8 +142,12 @@ export function AdministrationDashboardPage() {
             {administrationAreas.slice(0, 3).map((area) => {
               const Icon = area.icon;
 
-              const content = (
-                <>
+              return (
+                <Link
+                  key={area.title}
+                  to={area.to}
+                  className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-5 transition hover:border-slate-700 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-400/70"
+                >
                   <div
                     className={`flex h-10 w-10 items-center justify-center rounded-xl ${area.iconClassName}`}
                   >
@@ -142,33 +161,13 @@ export function AdministrationDashboardPage() {
                   <p className="mt-1 text-sm leading-6 text-slate-500">
                     {area.description}
                   </p>
-                </>
-              );
-
-              if (area.to) {
-                return (
-                  <Link
-                    key={area.title}
-                    to={area.to}
-                    className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-5 transition hover:border-slate-700 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-400/70"
-                  >
-                    {content}
-                  </Link>
-                );
-              }
-
-              return (
-                <article
-                  key={area.title}
-                  className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-5"
-                >
-                  {content}
-                </article>
+                </Link>
               );
             })}
           </div>
         </section>
 
+        {/* Organization & Service Configuration */}
         <section aria-labelledby="organization-heading">
           <div className="mb-4">
             <h2
@@ -187,8 +186,12 @@ export function AdministrationDashboardPage() {
             {administrationAreas.slice(3, 8).map((area) => {
               const Icon = area.icon;
 
-              const content = (
-                <>
+              return (
+                <Link
+                  key={area.title}
+                  to={area.to}
+                  className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-5 transition hover:border-slate-700 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-400/70"
+                >
                   <div
                     className={`flex h-10 w-10 items-center justify-center rounded-xl ${area.iconClassName}`}
                   >
@@ -202,28 +205,51 @@ export function AdministrationDashboardPage() {
                   <p className="mt-1 text-sm leading-6 text-slate-500">
                     {area.description}
                   </p>
-                </>
+                </Link>
               );
+            })}
+          </div>
+        </section>
 
-              if (area.to) {
-                return (
-                  <Link
-                    key={area.title}
-                    to={area.to}
-                    className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-5 transition hover:border-slate-700 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-400/70"
-                  >
-                    {content}
-                  </Link>
-                );
-              }
+        {/* Governance & Analytics */}
+        <section aria-labelledby="governance-heading">
+          <div className="mb-4">
+            <h2
+              id="governance-heading"
+              className="text-sm font-semibold text-white"
+            >
+              Governance &amp; Analytics
+            </h2>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Monitor platform activity, governance, and service performance.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {administrationAreas.slice(8).map((area) => {
+              const Icon = area.icon;
 
               return (
-                <article
+                <Link
                   key={area.title}
-                  className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-5"
+                  to={area.to}
+                  className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-5 transition hover:border-slate-700 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-400/70"
                 >
-                  {content}
-                </article>
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl ${area.iconClassName}`}
+                  >
+                    <Icon size={18} aria-hidden="true" />
+                  </div>
+
+                  <h3 className="mt-4 text-sm font-semibold text-white">
+                    {area.title}
+                  </h3>
+
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    {area.description}
+                  </p>
+                </Link>
               );
             })}
           </div>
