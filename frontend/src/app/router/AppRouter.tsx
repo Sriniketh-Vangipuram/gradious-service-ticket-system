@@ -23,6 +23,7 @@ import { AdministrationTicketsPage } from "../../features/administration/tickets
 import AdministrationUsersPage from "../../features/administration/users/pages/AdministrationUsersPage";
 import { AdministrationCentersPage } from "../../features/administration/centers/pages/AdministrationCentersPage";
 import LabsPage from "../../features/administration/labs/pages/LabsPage";
+import { CategoriesPage } from "../../features/administration/categories/pages/CategoriesPage";
 
 
 
@@ -164,6 +165,11 @@ export function AppRouter() {
           <Route 
             path={ROUTES.administration.labs}
             element={<LabsPage/>}
+          />
+
+          <Route
+            path={ROUTES.administration.categories}
+            element={<CategoriesPage/>}
           />
         </Route>
       </Route>

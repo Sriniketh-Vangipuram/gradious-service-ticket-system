@@ -42,8 +42,11 @@ export default function CreateLabDialog({
   open,
   onClose,
 }: CreateLabDialogProps) {
-  const createLabMutation =
-    useCreateLab();
+  const createLabMutation = useCreateLab();
+
+  const {
+    reset: resetCreateLabMutation,
+  } = createLabMutation;
 
   const centersQuery = useCenters({
     page: 1,
@@ -76,12 +79,12 @@ export default function CreateLabDialog({
   useEffect(() => {
     if (!open) {
       reset();
-      createLabMutation.reset();
+      resetCreateLabMutation();
     }
   }, [
     open,
     reset,
-    createLabMutation,
+    resetCreateLabMutation,
   ]);
 
   if (!open) {
