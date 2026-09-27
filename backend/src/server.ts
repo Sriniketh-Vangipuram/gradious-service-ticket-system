@@ -16,15 +16,17 @@ let stopSlaAlertScheduler: (() => Promise<void>) | undefined;
 
 const startServer = async (): Promise<void> => {
   try {
+    console.log("[Startup] Connecting to database...");
+
     await prisma.$connect();
 
-    console.log("Database connected");
+    console.log("[Startup] Database connected");
 
     stopSlaAlertScheduler = startSlaAlertScheduler();
 
     server.listen(env.PORT, () => {
       console.log(
-        `API server running on http://localhost:${env.PORT}`
+        `API server running on http://localhost:${env.PORT}`,
       );
     });
   } catch (error) {
