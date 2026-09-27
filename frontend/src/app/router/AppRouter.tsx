@@ -28,6 +28,7 @@ import { CategoriesPage } from "../../features/administration/categories/pages/C
 
 
 import { useCurrentUser } from "../../features/auth/hooks/useCurrentUser";
+import { SoftwarePage } from "../../features/administration/software/pages/SoftwarePage";
 
 function NotFoundPlaceholder() {
   return <div className="p-8">Page not found</div>;
@@ -170,6 +171,11 @@ export function AppRouter() {
           <Route
             path={ROUTES.administration.categories}
             element={<CategoriesPage/>}
+          />
+
+          <Route
+           path={ROUTES.administration.software}
+           element={<SoftwarePage/>}
           />
         </Route>
       </Route>
