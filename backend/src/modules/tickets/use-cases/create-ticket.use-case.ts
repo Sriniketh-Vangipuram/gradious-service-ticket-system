@@ -442,6 +442,16 @@ export async function createTicketUseCase(
         }
       });
 
+      console.log(
+          "[TicketCreate] ticket returned from Prisma:",
+          ticket,
+      );
+
+      if (!ticket) {
+          throw new Error(
+            "DEBUG: tx.ticket.create() returned null",
+          );
+      }
       await tx.ticketHistory.create({
         data: {
           ticketId: ticket.id,
