@@ -10,7 +10,8 @@ export type TicketLifecycleAction =
   | "RESOLVE"
   | "CONFIRM_CLOSURE"
   | "REOPEN"
-  | "CANCEL";
+  | "CANCEL"
+  | "REQUEST_CANCELLATION";
 
 
 type TicketLifecycleAccessContext = {
@@ -74,11 +75,16 @@ export function assertTicketLifecycleAccess(
       }
       break;
 
+    case "REQUEST_CANCELLATION":
+      if(actor.role === UserRole.CENTER_MANAGER){
+        return;
+      }
+      break;
+
     case "CANCEL":
       if (
         (isRequester) ||
-        actor.role === UserRole.ADMIN ||
-        actor.role === UserRole.CENTER_MANAGER
+        actor.role === UserRole.ADMIN
       ) {
         return;
       }
@@ -113,14 +119,21 @@ export function getTicketLifecycleScope(
       throw new AppError("FORBIDDEN", "You are not authorized to perform this ticket action.");
 
     case UserRole.CENTER_MANAGER:
-      return {
-        id: ticketId,
-        center: {
-          userAccess: {
-            some: { userId: actor.userId },
+      if (action === "REQUEST_CANCELLATION") {
+        return {
+          id: ticketId,
+          center: {
+            userAccess: {
+              some: { userId: actor.userId },
+            },
           },
-        },
-      };
+        };
+      }
+
+      throw new AppError(
+        "FORBIDDEN",
+        "You are not authorized to perform this ticket action.",
+      );
 
     default:
       throw new AppError("FORBIDDEN", "You are not authorized to perform this ticket action.");

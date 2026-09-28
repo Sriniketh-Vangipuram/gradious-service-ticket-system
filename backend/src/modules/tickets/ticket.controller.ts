@@ -11,6 +11,16 @@ import {
   updateTicketParamsSchema,
   updateTicketBodySchema,
 } from "./ticket.schemas";
+import {
+  approveCancellationRequestUseCase,
+} from "./use-cases/lifecycle/approve-cancellation.use-case";
+
+import {
+  rejectCancellationRequestUseCase,
+} from "./use-cases/lifecycle/reject-cancellation-request.use-case";
+
+import { requestCancellationBodySchema } from "./ticket.schemas";
+import { requestCancellationUseCase } from "./use-cases/lifecycle/request-cancellation.use-case";
 
 import { AppError } from "../../common/errors/app-error";
 
@@ -543,6 +553,117 @@ export async function assignTechnicianController(
 
     sendSuccess(res, {
       ticket,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function requestCancellationController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { ticketId } = getValidatedData(
+      req,
+      { params: ticketIdParamsSchema },
+      "params",
+    );
+
+    const body = getValidatedData(
+      req,
+      { body: requestCancellationBodySchema },
+      "body",
+    );
+
+    const actor = req.authUser;
+
+    if (!actor) {
+      return next(
+        new Error(
+          "Authenticated user missing after requireAuth middleware.",
+        ),
+      );
+    }
+
+    const result = await requestCancellationUseCase(
+      ticketId,
+      body,
+      actor,
+    );
+
+    sendSuccess(res, result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function approveCancellationRequestController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const ticketId = Number(req.params.ticketId);
+    const historyId = Number(req.params.historyId);
+
+    const actor = req.authUser;
+
+    if (!actor) {
+      throw new AppError(
+        "UNAUTHENTICATED",
+        "Authentication required.",
+      );
+    }
+
+    const ticket =
+      await approveCancellationRequestUseCase(
+        ticketId,
+        historyId,
+        actor,
+      );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ticket,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function rejectCancellationRequestController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const ticketId = Number(req.params.ticketId);
+    const historyId = Number(req.params.historyId);
+
+    const actor = req.authUser;
+
+    if (!actor) {
+      throw new AppError(
+        "UNAUTHENTICATED",
+        "Authentication required.",
+      );
+    }
+
+    const result =
+      await rejectCancellationRequestUseCase(
+        ticketId,
+        historyId,
+        req.body,
+        actor,
+      );
+
+    res.status(200).json({
+      success: true,
+      data: result,
     });
   } catch (error) {
     next(error);

@@ -6,6 +6,7 @@ import {
   MapPin,
   MessageCircle,
   RefreshCw,
+  XCircle,
 } from "lucide-react";
 
 import { Link, useLocation, useParams } from "react-router-dom";
@@ -19,7 +20,6 @@ import { TicketComments } from "../../comments/components/TicketComments";
 import { useCurrentUser } from "../../auth/hooks/useCurrentUser";
 import { canRespondToTicket } from "../ticket.permissions";
 import { TicketAssignmentPanel } from "../components/TicketAssignmentPanel";
-
 
 interface TicketDetailsNavigationState {
   from?: string;
@@ -73,6 +73,16 @@ function formatRequestType(
   return requestType.charAt(0) + requestType.slice(1).toLowerCase();
 }
 
+function formatRole(role: string): string {
+  return role
+    .split("_")
+    .map(
+      (part) =>
+        part.charAt(0) + part.slice(1).toLowerCase(),
+    )
+    .join(" ");
+}
+
 export function TicketDetailsPage() {
   const { ticketId } = useParams<{ ticketId: string }>();
 
@@ -100,7 +110,8 @@ export function TicketDetailsPage() {
 
   const { data: currentUserResponse } = useCurrentUser();
 
-  const currentUser = currentUserResponse?.data.user??null;
+  const currentUser =
+    currentUserResponse?.data.user ?? null;
 
   if (!isValidTicketId) {
     return (
@@ -155,7 +166,10 @@ export function TicketDetailsPage() {
     );
   }
 
-  if (ticketQuery.isError || !ticketQuery.data?.data.ticket) {
+  if (
+    ticketQuery.isError ||
+    !ticketQuery.data?.data.ticket
+  ) {
     return (
       <section className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl">
@@ -180,7 +194,9 @@ export function TicketDetailsPage() {
                 <RefreshCw
                   size={16}
                   className={
-                    ticketQuery.isFetching ? "animate-spin" : ""
+                    ticketQuery.isFetching
+                      ? "animate-spin"
+                      : ""
                   }
                   aria-hidden="true"
                 />
@@ -191,7 +207,10 @@ export function TicketDetailsPage() {
                 to={backPath}
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:border-slate-600 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400/70"
               >
-                <ArrowLeft size={16} aria-hidden="true" />
+                <ArrowLeft
+                  size={16}
+                  aria-hidden="true"
+                />
                 {backLabel}
               </Link>
             </div>
@@ -202,6 +221,16 @@ export function TicketDetailsPage() {
   }
 
   const ticket = ticketQuery.data.data.ticket;
+
+  const cancellation = ticket.cancellation;
+  const cancellationRequest =
+    ticket.cancellationRequest;
+
+  const hasCancellation =
+    cancellation !== null;
+
+  const hasCancellationRequest =
+    cancellationRequest !== null;
 
   return (
     <section className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8">
@@ -214,6 +243,10 @@ export function TicketDetailsPage() {
           {backLabel}
         </Link>
 
+        {/* -------------------------------------------------------------- */}
+        {/* Ticket header                                                   */}
+        {/* -------------------------------------------------------------- */}
+
         <div className="mt-5 rounded-2xl border border-slate-800/80 bg-slate-900/60 p-6 shadow-sm sm:p-7">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
@@ -222,9 +255,13 @@ export function TicketDetailsPage() {
                   {ticket.ticketNumber}
                 </span>
 
-                <TicketStatusBadge status={ticket.status} />
+                <TicketStatusBadge
+                  status={ticket.status}
+                />
 
-                <TicketPriorityBadge priority={ticket.priority} />
+                <TicketPriorityBadge
+                  priority={ticket.priority}
+                />
               </div>
 
               <h1 className="mt-4 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
@@ -252,6 +289,236 @@ export function TicketDetailsPage() {
           </div>
         </div>
 
+        {/* -------------------------------------------------------------- */}
+        {/* Final cancellation information                                  */}
+        {/* -------------------------------------------------------------- */}
+
+        {hasCancellation ? (
+          <section
+            aria-labelledby="ticket-cancellation-heading"
+            className="mt-5 rounded-2xl border border-red-500/20 bg-red-500/5 p-5 sm:p-6"
+          >
+            <div className="flex items-start gap-3">
+              <div
+                aria-hidden="true"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 text-red-300"
+              >
+                <XCircle size={19} />
+              </div>
+
+              <div className="min-w-0">
+                <h2
+                  id="ticket-cancellation-heading"
+                  className="text-sm font-semibold text-red-200"
+                >
+                  Ticket cancelled
+                </h2>
+
+                <p className="mt-1 text-sm leading-6 text-red-200/70">
+                  This ticket has been cancelled. The
+                  cancellation reason is recorded below.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-5 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <p className="text-xs font-medium uppercase tracking-[0.12em] text-red-200/50">
+                  Cancellation reason
+                </p>
+
+                <p className="mt-2 rounded-xl border border-red-500/10 bg-slate-950/40 p-4 text-sm leading-6 text-slate-200">
+                  {cancellation.reason}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-red-200/50">
+                  Cancelled by
+                </p>
+
+                <p className="mt-1 text-sm font-medium text-slate-200">
+                  {cancellation.cancelledBy
+                    ? cancellation.cancelledBy.fullName
+                    : "Unknown"}
+                </p>
+
+                {cancellation.cancelledBy ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    {formatRole(
+                      cancellation.cancelledBy.role,
+                    )}
+                  </p>
+                ) : null}
+              </div>
+
+              <div>
+                <p className="text-xs text-red-200/50">
+                  Cancelled at
+                </p>
+
+                <p className="mt-1 text-sm font-medium text-slate-200">
+                  {formatDate(
+                    cancellation.cancelledAt,
+                  )}
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {/* -------------------------------------------------------------- */}
+        {/* Cancellation request information                                */}
+        {/* -------------------------------------------------------------- */}
+
+        {hasCancellationRequest ? (
+          <section
+            aria-labelledby="ticket-cancellation-request-heading"
+            className="mt-5 rounded-2xl border border-orange-500/20 bg-orange-500/5 p-5 sm:p-6"
+          >
+            <div className="flex items-start gap-3">
+              <div
+                aria-hidden="true"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-orange-500/20 bg-orange-500/10 text-orange-300"
+              >
+                <XCircle size={19} />
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2
+                    id="ticket-cancellation-request-heading"
+                    className="text-sm font-semibold text-orange-200"
+                  >
+                    Cancellation request
+                  </h2>
+
+                  <span
+                    className={
+                      cancellationRequest.status ===
+                      "PENDING"
+                        ? "rounded-full border border-orange-500/20 bg-orange-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-orange-200"
+                        : "rounded-full border border-slate-600 bg-slate-800/60 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-300"
+                    }
+                  >
+                    {cancellationRequest.status}
+                  </span>
+                </div>
+
+                <p className="mt-1 text-sm leading-6 text-orange-200/70">
+                  {cancellationRequest.status ===
+                  "PENDING"
+                    ? "A center manager has requested cancellation of this ticket. The ticket remains in its current status until an administrator reviews the request."
+                    : "The cancellation request was reviewed by an administrator and was not approved."}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-5 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <p className="text-xs font-medium uppercase tracking-[0.12em] text-orange-200/50">
+                  Requested cancellation reason
+                </p>
+
+                <p className="mt-2 rounded-xl border border-orange-500/10 bg-slate-950/40 p-4 text-sm leading-6 text-slate-200">
+                  {cancellationRequest.reason}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-orange-200/50">
+                  Requested by
+                </p>
+
+                <p className="mt-1 text-sm font-medium text-slate-200">
+                  {cancellationRequest.requestedBy
+                    ? cancellationRequest.requestedBy.fullName
+                    : "Unknown"}
+                </p>
+
+                {cancellationRequest.requestedBy ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    {formatRole(
+                      cancellationRequest.requestedBy
+                        .role,
+                    )}
+                  </p>
+                ) : null}
+              </div>
+
+              <div>
+                <p className="text-xs text-orange-200/50">
+                  Requested at
+                </p>
+
+                <p className="mt-1 text-sm font-medium text-slate-200">
+                  {formatDate(
+                    cancellationRequest.requestedAt,
+                  )}
+                </p>
+              </div>
+
+              {cancellationRequest.status ===
+                "REJECTED" &&
+              cancellationRequest.reviewReason ? (
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
+                    Administrator review reason
+                  </p>
+
+                  <p className="mt-2 rounded-xl border border-slate-700 bg-slate-950/40 p-4 text-sm leading-6 text-slate-300">
+                    {cancellationRequest.reviewReason}
+                  </p>
+                </div>
+              ) : null}
+
+              {cancellationRequest.status ===
+                "REJECTED" ? (
+                <>
+                  <div>
+                    <p className="text-xs text-slate-500">
+                      Reviewed by
+                    </p>
+
+                    <p className="mt-1 text-sm font-medium text-slate-200">
+                      {cancellationRequest.reviewedBy
+                        ? cancellationRequest.reviewedBy
+                            .fullName
+                        : "Unknown"}
+                    </p>
+
+                    {cancellationRequest.reviewedBy ? (
+                      <p className="mt-1 text-xs text-slate-500">
+                        {formatRole(
+                          cancellationRequest
+                            .reviewedBy.role,
+                        )}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-500">
+                      Reviewed at
+                    </p>
+
+                    <p className="mt-1 text-sm font-medium text-slate-200">
+                      {formatDate(
+                        cancellationRequest.reviewedAt ??
+                          null,
+                      )}
+                    </p>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        {/* -------------------------------------------------------------- */}
+        {/* Waiting for user                                                */}
+        {/* -------------------------------------------------------------- */}
+
         {ticket.status === "WAITING_FOR_USER" ? (
           <section
             aria-labelledby="response-required-heading"
@@ -274,20 +541,26 @@ export function TicketDetailsPage() {
                 </h2>
 
                 <p className="mt-1 text-sm leading-6 text-amber-200/70">
-                  The service desk is waiting for additional information from
-                  you. Reply in the conversation below to continue this
-                  request.
+                  The service desk is waiting for additional
+                  information from you. Reply in the
+                  conversation below to continue this request.
                 </p>
               </div>
             </div>
           </section>
         ) : null}
 
+        {/* -------------------------------------------------------------- */}
+        {/* Request / location / assignment                                 */}
+        {/* -------------------------------------------------------------- */}
+
         <div className="mt-5 grid gap-5 lg:grid-cols-3">
           <article className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5">
             <div className="flex items-center gap-2 text-slate-300">
               <FileText size={17} aria-hidden="true" />
-              <h2 className="text-sm font-semibold">Request details</h2>
+              <h2 className="text-sm font-semibold">
+                Request details
+              </h2>
             </div>
 
             <dl className="mt-5 space-y-4">
@@ -297,7 +570,9 @@ export function TicketDetailsPage() {
                 </dt>
 
                 <dd className="mt-1 text-sm font-medium text-slate-200">
-                  {formatRequestType(ticket.requestType)}
+                  {formatRequestType(
+                    ticket.requestType,
+                  )}
                 </dd>
               </div>
 
@@ -367,6 +642,10 @@ export function TicketDetailsPage() {
           <TicketAssignmentPanel ticket={ticket} />
         </div>
 
+        {/* -------------------------------------------------------------- */}
+        {/* SLA                                                              */}
+        {/* -------------------------------------------------------------- */}
+
         <article className="mt-5 rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5 sm:p-6">
           <div className="flex items-center gap-2 text-slate-300">
             <Clock3 size={17} aria-hidden="true" />
@@ -382,7 +661,9 @@ export function TicketDetailsPage() {
               </p>
 
               <p className="mt-1 text-sm font-medium text-slate-200">
-                {formatDuration(ticket.firstResponseTargetMinutes)}
+                {formatDuration(
+                  ticket.firstResponseTargetMinutes,
+                )}
               </p>
             </div>
 
@@ -392,7 +673,9 @@ export function TicketDetailsPage() {
               </p>
 
               <p className="mt-1 text-sm font-medium text-slate-200">
-                {formatDuration(ticket.resolutionTargetMinutes)}
+                {formatDuration(
+                  ticket.resolutionTargetMinutes,
+                )}
               </p>
             </div>
 
@@ -402,7 +685,9 @@ export function TicketDetailsPage() {
               </p>
 
               <p className="mt-1 text-sm font-medium text-slate-200">
-                {formatDate(ticket.firstResponseDueAt)}
+                {formatDate(
+                  ticket.firstResponseDueAt,
+                )}
               </p>
             </div>
 
@@ -412,11 +697,17 @@ export function TicketDetailsPage() {
               </p>
 
               <p className="mt-1 text-sm font-medium text-slate-200">
-                {formatDate(ticket.resolutionDueAt)}
+                {formatDate(
+                  ticket.resolutionDueAt,
+                )}
               </p>
             </div>
           </div>
         </article>
+
+        {/* -------------------------------------------------------------- */}
+        {/* Timeline                                                         */}
+        {/* -------------------------------------------------------------- */}
 
         <article className="mt-5 rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5 sm:p-6">
           <div className="flex items-center gap-2 text-slate-300">
@@ -469,6 +760,10 @@ export function TicketDetailsPage() {
           </dl>
         </article>
 
+        {/* -------------------------------------------------------------- */}
+        {/* Lifecycle actions                                                */}
+        {/* -------------------------------------------------------------- */}
+
         {currentUser ? (
           <div className="mt-5">
             <TicketLifecycleActions
@@ -478,12 +773,19 @@ export function TicketDetailsPage() {
           </div>
         ) : null}
 
+        {/* -------------------------------------------------------------- */}
+        {/* Comments                                                         */}
+        {/* -------------------------------------------------------------- */}
+
         <TicketComments
           ticketId={ticket.id}
           currentUser={currentUser}
           canRespond={
             currentUser
-              ? canRespondToTicket(currentUser, ticket)
+              ? canRespondToTicket(
+                  currentUser,
+                  ticket,
+                )
               : false
           }
           isResponseRequired={

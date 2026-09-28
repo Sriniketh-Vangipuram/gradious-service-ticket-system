@@ -51,6 +51,43 @@ export interface TicketLab {
   code: string;
 }
 
+export interface TicketCancellation {
+  reason: string;
+  cancelledAt: string;
+  cancelledBy: {
+    id: number;
+    fullName: string;
+    role: string;
+  } | null;
+}
+
+export type CancellationRequestStatus =
+  | "PENDING"
+  | "REJECTED";
+
+export interface TicketCancellationRequest {
+  id: number;
+  status: CancellationRequestStatus;
+  reason: string;
+  requestedAt: string;
+
+  requestedBy: {
+    id: number;
+    fullName: string;
+    role: string;
+  };
+
+  reviewedAt?: string;
+
+  reviewReason?: string;
+
+  reviewedBy?: {
+    id: number;
+    fullName: string;
+    role: string;
+  };
+}
+
 export interface Ticket {
   id: number;
   ticketNumber: string;
@@ -99,6 +136,9 @@ export interface Ticket {
    */
   category: unknown;
   software: unknown | null;
+  
+  cancellation: TicketCancellation | null;
+  cancellationRequest: TicketCancellationRequest | null;
 }
 
 

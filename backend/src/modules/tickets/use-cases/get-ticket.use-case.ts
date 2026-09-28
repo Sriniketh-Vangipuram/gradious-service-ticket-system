@@ -1,6 +1,9 @@
 import { UserRole } from "../../../generated/prisma/client";
 import { prisma } from "../../../config/database";
 import { AppError } from "../../../common/errors/app-error";
+import {
+  getTicketCancellationInfo,
+} from "./get-ticket-cancellation-info";
 
 type TicketActor = {
     userId:number;
@@ -114,5 +117,16 @@ export async function getTicketUseCase(
         throw new AppError("NOT_FOUND","Ticket not found.");
     }
 
-    return ticket;
+    const cancellationInfo =
+    await getTicketCancellationInfo(
+        prisma,
+        ticket.id,
+        actor,
+    );
+
+    return {
+    ...ticket,
+    ...cancellationInfo,
+    };
+
 }

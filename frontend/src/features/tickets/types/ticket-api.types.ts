@@ -186,3 +186,43 @@ export type GetEligibleManagersResponse =
   TicketSuccessResponse<{
     managers: EligibleManager[];
   }>;
+
+/* -------------------------------------------------------------------------- */
+/* Cancellation request                                                       */
+/* -------------------------------------------------------------------------- */
+
+export interface RequestCancellationRequest {
+  reason: string;
+}
+
+export type RequestCancellationResponse =
+  TicketSuccessResponse<{
+    ticketId: number;
+    ticketNumber: string;
+    status: TicketStatus;
+    centerId: number;
+    historyId: number;
+  }>;
+
+/* -------------------------------------------------------------------------- */
+/* Cancellation request review                                                */
+/* -------------------------------------------------------------------------- */
+
+export interface ReviewCancellationRequest {
+  reason: string;
+}
+
+export type ApproveCancellationRequestResponse =
+  TicketSuccessResponse<{
+    ticket: Ticket;
+  }>;
+
+export type RejectCancellationRequestResponse =
+  TicketSuccessResponse<{
+    ticketId: number;
+    ticketNumber: string;
+    status: TicketStatus;
+    rejectionHistoryId: number;
+    recipientIds: number[];
+    notifications: unknown[];
+  }>;

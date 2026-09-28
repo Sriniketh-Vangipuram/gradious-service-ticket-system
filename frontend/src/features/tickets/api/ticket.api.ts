@@ -23,6 +23,11 @@ import type {
   AssignTechnicianRequest,
   AssignTechnicianResponse,
   GetEligibleManagersResponse,
+  RequestCancellationRequest,
+  RequestCancellationResponse,
+  ReviewCancellationRequest,
+  ApproveCancellationRequestResponse,
+  RejectCancellationRequestResponse,
 } from "../types/ticket-api.types";
 import type { EligibleTechnician } from "../types/ticket.types";
 
@@ -182,6 +187,47 @@ export async function cancelTicket(
 
   return response.data;
 }
+
+export async function requestTicketCancellation(
+  ticketId: number,
+  payload: RequestCancellationRequest,
+): Promise<RequestCancellationResponse> {
+  const response =
+    await httpClient.post<RequestCancellationResponse>(
+      `/tickets/${ticketId}/cancellation-request`,
+      payload,
+    );
+
+  return response.data;
+}
+
+export async function approveTicketCancellationRequest(
+  ticketId: number,
+  historyId: number,
+): Promise<ApproveCancellationRequestResponse> {
+  const response =
+    await httpClient.post<ApproveCancellationRequestResponse>(
+      `/tickets/${ticketId}/cancellation-request/${historyId}/approve`,
+    );
+
+  return response.data;
+}
+
+
+export async function rejectTicketCancellationRequest(
+  ticketId: number,
+  historyId: number,
+  payload: ReviewCancellationRequest,
+): Promise<RejectCancellationRequestResponse> {
+  const response =
+    await httpClient.post<RejectCancellationRequestResponse>(
+      `/tickets/${ticketId}/cancellation-request/${historyId}/reject`,
+      payload,
+    );
+
+  return response.data;
+}
+
 
 export type GetEligibleTechniciansResponse =
   TicketSuccessResponse<{

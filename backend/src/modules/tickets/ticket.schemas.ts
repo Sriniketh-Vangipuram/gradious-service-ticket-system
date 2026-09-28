@@ -446,3 +446,53 @@ export type AssignCenterManagerBody = z.infer<
 export type AssignTechnicianBody = z.infer<
   typeof assignTechnicianBodySchema
 >;
+
+/* ============================================================
+ * REQUEST TICKET CANCELLATION
+ * ============================================================ */
+
+export const requestCancellationBodySchema = z
+  .object({
+    reason: z
+      .string()
+      .trim()
+      .min(1, "Cancellation reason cannot be empty.")
+      .max(
+        500,
+        "Cancellation reason cannot exceed 500 characters.",
+      ),
+  })
+  .strict();
+
+/* ============================================================
+ * REVIEW CANCELLATION REQUEST
+ * ============================================================ */
+
+export const reviewCancellationRequestBodySchema = z
+  .object({
+    reason: z
+      .string()
+      .trim()
+      .min(1, "Review reason cannot be empty.")
+      .max(
+        500,
+        "Review reason cannot exceed 500 characters.",
+      ),
+  })
+  .strict();
+
+export type RequestCancellationBody = z.infer<
+  typeof requestCancellationBodySchema
+>;
+
+export type ReviewCancellationRequestBody = z.infer<
+  typeof reviewCancellationRequestBodySchema
+>;
+
+export const cancellationRequestReviewParamsSchema =
+  z.object({
+    ticketId: z.coerce.number().int().positive(),
+    historyId: z.coerce.number().int().positive(),
+  }).strict();
+
+  

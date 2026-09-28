@@ -15,6 +15,9 @@ import {
   cancelTicketBodySchema,
   assignCenterManagerBodySchema,
   assignTechnicianBodySchema,
+  requestCancellationBodySchema,
+  reviewCancellationRequestBodySchema,
+  cancellationRequestReviewParamsSchema,
 
 } from "./ticket.schemas";
 
@@ -32,6 +35,10 @@ import {
   assignCenterManagerController,
   assignTechnicianController,
   getEligibleManagersController,
+  approveCancellationRequestController,
+  rejectCancellationRequestController,
+  requestCancellationController,
+  
 } from "./ticket.controller";
 
 import commentRouter from "../comments/comment.routes";
@@ -114,6 +121,35 @@ ticketRouter.patch(
     body: assignTechnicianBodySchema,
   }),
   assignTechnicianController,
+);
+
+ticketRouter.post(
+  "/:ticketId/cancellation-request",
+  requireAuth,
+  validateRequest({
+    params: ticketIdParamsSchema,
+    body: requestCancellationBodySchema,
+  }),
+  requestCancellationController,
+);
+
+ticketRouter.post(
+  "/:ticketId/cancellation-request/:historyId/approve",
+  requireAuth,
+  validateRequest({
+    params: cancellationRequestReviewParamsSchema,
+  }),
+  approveCancellationRequestController,
+);
+
+ticketRouter.post(
+  "/:ticketId/cancellation-request/:historyId/reject",
+  requireAuth,
+  validateRequest({
+    params: cancellationRequestReviewParamsSchema,
+    body: reviewCancellationRequestBodySchema,
+  }),
+  rejectCancellationRequestController,
 );
 
 ticketRouter.patch(

@@ -62,8 +62,26 @@ export function canCancelTicket(
 
   return (
     ticket.requesterId === user.id ||
-    user.role === "CENTER_MANAGER" ||
     user.role === "ADMIN"
+  );
+}
+
+export function canRequestCancellation(
+  user: AuthUser,
+  ticket: Ticket,
+): boolean {
+  const cancellable =
+    ticket.status !== "RESOLVED" &&
+    ticket.status !== "CLOSED" &&
+    ticket.status !== "CANCELLED";
+
+  if (!cancellable) {
+    return false;
+  }
+
+  return (
+    user.role === "CENTER_MANAGER" &&
+    user.centerId === ticket.centerId
   );
 }
 
