@@ -7,6 +7,7 @@ import {env} from "../../config/env";
 import { createAccessToken,generateRefreshToken,hashRefreshToken } from "./auth.tokens";
 import type { LoginInput,RegisterInput } from "./auth.schemas";
 import { createAuditLog } from "../audit/audit.service";
+import { UserRole } from "../../generated/prisma/enums";
 
 export class AuthError extends Error{
     constructor(
@@ -191,7 +192,7 @@ type RefreshResult =
         id: number;
         fullName: string;
         email: string;
-        role: string;
+        role: UserRole;
         centerId: number | null;
         labId: number | null;
       };

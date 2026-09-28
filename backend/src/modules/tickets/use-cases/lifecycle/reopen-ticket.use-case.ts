@@ -3,6 +3,7 @@ import {
   TicketStatus,
   UserRole,
 } from "../../../../generated/prisma/client";
+import { Prisma } from "../../../../generated/prisma/client";
 import { prisma } from "../../../../config/database";
 import { AppError } from "../../../../common/errors/app-error";
 import type { AuthenticatedUser } from "../../../../middleware/auth.middleware";
@@ -139,6 +140,7 @@ export async function reopenTicketUseCase(
 
       const nextCycleNumber = (latestCycle?.cycleNumber ?? 0) + 1;
 
+      try {
       await tx.ticketSlaCycle.create({
         data: {
           ticketId: ticket.id,
@@ -146,9 +148,23 @@ export async function reopenTicketUseCase(
           startedAt: slaStartedAt,
           dueAt: resolutionDueAt,
           targetMinutes: slaPolicy.resolutionMinutes,
-          atRiskThresholdPercent: slaPolicy.atRiskThresholdPercent,
+          atRiskThresholdPercent:
+            slaPolicy.atRiskThresholdPercent,
         },
       });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new AppError(
+          "CONFLICT",
+          "The ticket was reopened concurrently. Please refresh and try again.",
+        );
+      }
+
+      throw error;
+    }
 
     // Update the ticket's current resolution SLA snapshot.
     await tx.ticket.update({

@@ -4,10 +4,11 @@ import { Server } from "socket.io";
 import { env } from "../config/env";
 import { ACCESS_COOKIE_NAME } from "../modules/auth/auth.cookies";
 import { verifyAccessToken } from "../modules/auth/auth.tokens";
+import { UserRole } from "../generated/prisma/enums";
 
 type SocketAuthUser = {
   userId: number;
-  role: string;
+  role: UserRole;
 };
 
 let socketServer: Server | null = null;

@@ -179,23 +179,14 @@ export async function assignCenterManagerUseCase(
      *
      * We intentionally do NOT touch assigneeId.
      */
-    await tx.ticket.update({
+
+    const updateResult = await tx.ticket.updateMany({
       where: {
         id: ticket.id,
+        centerManagerId: ticket.centerManagerId,
       },
-
       data: {
-        centerManager: {
-          connect: {
-            id: body.centerManagerId,
-          },
-        },
-
-        /*
-         * First manager assignment moves OPEN → TRIAGED.
-         *
-         * Reassignment does not blindly reset the ticket status.
-         */
+        centerManagerId: body.centerManagerId,
         ...(ticket.centerManagerId === null &&
         ticket.status === TicketStatus.OPEN
           ? {
@@ -204,6 +195,39 @@ export async function assignCenterManagerUseCase(
           : {}),
       },
     });
+
+    if (updateResult.count !== 1) {
+      throw new AppError(
+        "CONFLICT",
+        "Ticket assignment changed before it could be updated. Refresh and try again.",
+      );
+    }
+
+    // await tx.ticket.update({
+    //   where: {
+    //     id: ticket.id,
+    //   },
+
+    //   data: {
+    //     centerManager: {
+    //       connect: {
+    //         id: body.centerManagerId,
+    //       },
+    //     },
+
+    //     /*
+    //      * First manager assignment moves OPEN → TRIAGED.
+    //      *
+    //      * Reassignment does not blindly reset the ticket status.
+    //      */
+    //     ...(ticket.centerManagerId === null &&
+    //     ticket.status === TicketStatus.OPEN
+    //       ? {
+    //           status: TicketStatus.TRIAGED,
+    //         }
+    //       : {}),
+    //   },
+    // });
 
     /*
      * 6. Record assignment history.

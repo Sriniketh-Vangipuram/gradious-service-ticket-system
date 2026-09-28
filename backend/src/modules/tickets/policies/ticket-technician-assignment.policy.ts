@@ -5,7 +5,7 @@ import { AppError } from "../../../common/errors/app-error";
 
 export type TicketTechnicianAssignmentActor = {
   userId: number;
-  role: string;
+  role: UserRole;
 };
 
 export function buildTicketTechnicianAssignmentScope(

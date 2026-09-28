@@ -4,7 +4,7 @@ import { AppError } from "../../../common/errors/app-error";
 
 type TicketActor = {
     userId:number;
-    role:string;
+    role:UserRole;
 };
 
 export async function getTicketUseCase(

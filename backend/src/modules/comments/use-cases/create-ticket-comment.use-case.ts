@@ -153,6 +153,9 @@ export async function createTicketComment(
           where: {
             ticketId: ticket.id,
             resolvedAt: null,
+            pausedAt:{
+              not:null,
+            },
           },
           orderBy: {
             cycleNumber: "desc",
@@ -255,19 +258,31 @@ export async function createTicketComment(
               "Ticket resumed after a public requester reply.",
           },
         });
+
+        // Notify the assigned technician that the requester has responded.
+        if (ticket.assigneeId !== null) {
+          createdNotifications = await createNotifications(tx, {
+            recipientIds: [ticket.assigneeId],
+            type: NotificationType.TICKET_STATUS_CHANGED,
+            title: "Employee responded to your query",
+            message: `The requester has replied to ticket ${ticket.ticketNumber}. The ticket is now IN_PROGRESS.`,
+            ticketId: ticket.id,
+            dedupeKey: `ticket:${ticket.id}:requester-reply:comment:${comment.id}`,
+          });
+      }
       }
 
-      // Notify the assigned technician that the requester has responded.
-      if (ticket.assigneeId !== null) {
-        createdNotifications = await createNotifications(tx, {
-          recipientIds: [ticket.assigneeId],
-          type: NotificationType.TICKET_STATUS_CHANGED,
-          title: "Employee responded to your query",
-          message: `The requester has replied to ticket ${ticket.ticketNumber}. The ticket is now IN_PROGRESS.`,
-          ticketId: ticket.id,
-          dedupeKey: `ticket:${ticket.id}:requester-reply:comment:${comment.id}`,
-        });
-      }
+      // // Notify the assigned technician that the requester has responded.
+      // if (ticket.assigneeId !== null) {
+      //   createdNotifications = await createNotifications(tx, {
+      //     recipientIds: [ticket.assigneeId],
+      //     type: NotificationType.TICKET_STATUS_CHANGED,
+      //     title: "Employee responded to your query",
+      //     message: `The requester has replied to ticket ${ticket.ticketNumber}. The ticket is now IN_PROGRESS.`,
+      //     ticketId: ticket.id,
+      //     dedupeKey: `ticket:${ticket.id}:requester-reply:comment:${comment.id}`,
+      //   });
+      // }
 
     const recipientIds: number[] = [];
 

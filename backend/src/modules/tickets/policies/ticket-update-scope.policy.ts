@@ -7,7 +7,7 @@ import { AppError } from "../../../common/errors/app-error";
 
 export type TicketUpdateActor = {
   userId: number;
-  role: string;
+  role: UserRole;
 };
 
 export function buildTicketUpdateScope(

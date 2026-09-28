@@ -1,4 +1,4 @@
-import type { AuditAction } from "../../generated/prisma/enums";
+import type { AuditAction, UserRole } from "../../generated/prisma/enums";
 
 export type AuditEntityType =
   | "USER"
@@ -64,7 +64,7 @@ export type AuditLogListItem = {
   actor: {
     id: number;
     fullName: string;
-    role: string;
+    role: UserRole;
   } | null;
 
   createdAt: Date;

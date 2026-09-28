@@ -4,7 +4,7 @@ import { AppError } from "../../../common/errors/app-error";
 
 export type TicketListActor = {
   userId: number;
-  role: string;
+  role: UserRole;
 };
 
 export function buildTicketListScope(

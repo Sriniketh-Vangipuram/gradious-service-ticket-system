@@ -162,17 +162,33 @@ export async function assignTechnicianUseCase(
         ? AssignmentEvent.ASSIGNED
         : AssignmentEvent.REASSIGNED;
 
-    await tx.ticket.update({
+    // await tx.ticket.update({
+    //   where: {
+    //     id: ticket.id,
+    //   },
+    //   data: {
+    //     assignee: {
+    //       connect: {
+    //         id: body.technicianId,
+    //       },
+    //     },
+
+    //     ...(ticket.assigneeId === null &&
+    //     ticket.status === TicketStatus.TRIAGED
+    //       ? {
+    //           status: TicketStatus.ASSIGNED,
+    //         }
+    //       : {}),
+    //   },
+    // });
+
+    const updateResult = await tx.ticket.updateMany({
       where: {
         id: ticket.id,
+        assigneeId: ticket.assigneeId,
       },
       data: {
-        assignee: {
-          connect: {
-            id: body.technicianId,
-          },
-        },
-
+        assigneeId: body.technicianId,
         ...(ticket.assigneeId === null &&
         ticket.status === TicketStatus.TRIAGED
           ? {
@@ -181,6 +197,12 @@ export async function assignTechnicianUseCase(
           : {}),
       },
     });
+    if (updateResult.count !== 1) {
+      throw new AppError(
+        "CONFLICT",
+        "Ticket assignment changed before it could be updated. Refresh and try again.",
+      );
+    }
 
     await tx.assignmentHistory.create({
       data: {

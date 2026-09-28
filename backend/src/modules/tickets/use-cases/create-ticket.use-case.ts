@@ -23,7 +23,7 @@ import { createAuditLog } from "../../audit/audit.service";
 
 type AuthenticatedActor = {
   userId: number;
-  role: string;
+  role: UserRole;
 };
 
 function isPrismaUniqueConstraintError(
@@ -422,18 +422,6 @@ export async function createTicketUseCase(
           atRiskThresholdPercent:
             slaPolicy.atRiskThresholdPercent,
 
-          slaCycles: {
-            create: {
-              cycleNumber: 1,
-              startedAt: slaStartedAt,
-              dueAt: resolutionDueAt,
-              targetMinutes:
-                slaPolicy.resolutionMinutes,
-              atRiskThresholdPercent:
-                slaPolicy.atRiskThresholdPercent,
-            },
-          },
-
           history: {
             create: {
               event: TicketHistoryEvent.CREATED,
@@ -462,6 +450,17 @@ export async function createTicketUseCase(
           updatedAt: true,
         },
       });
+
+      await tx.ticketSlaCycle.create({
+        data:{
+          ticketId:ticket.id,
+          cycleNumber:1,
+          startedAt:slaStartedAt,
+          dueAt:resolutionDueAt,
+          targetMinutes:slaPolicy.resolutionMinutes,
+          atRiskThresholdPercent:slaPolicy.atRiskThresholdPercent,
+        }
+      })
 
       await createAuditLog(
           {
