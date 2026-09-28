@@ -421,15 +421,6 @@ export async function createTicketUseCase(
 
           atRiskThresholdPercent:
             slaPolicy.atRiskThresholdPercent,
-
-          history: {
-            create: {
-              event: TicketHistoryEvent.CREATED,
-              actorId: requester.id,
-              toValue: "OPEN",
-              description: "Ticket created.",
-            },
-          },
         },
 
         select: {
@@ -448,11 +439,21 @@ export async function createTicketUseCase(
           softwareId: true,
           createdAt: true,
           updatedAt: true,
+        }
+      });
+
+      await tx.ticketHistory.create({
+        data: {
+          ticketId: ticket.id,
+          event: TicketHistoryEvent.CREATED,
+          actorId: requester.id,
+          toValue: "OPEN",
+          description: "Ticket created.",
         },
       });
 
       await tx.ticketSlaCycle.create({
-        data:{
+        data: {
           ticketId:ticket.id,
           cycleNumber:1,
           startedAt:slaStartedAt,
