@@ -907,7 +907,12 @@ export async function updateTicketUseCase(
         body.title !== undefined ||
         body.description !== undefined,
     };
-  });
+    },
+    {
+      maxWait: 5000,
+      timeout: 15000,
+    }
+  );
 
   /*
    * ---------------------------------------------------------

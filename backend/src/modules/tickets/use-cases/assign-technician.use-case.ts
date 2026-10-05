@@ -291,7 +291,12 @@ export async function assignTechnicianUseCase(
       assignmentEvent,
       changed: true,
     };
-  });
+  },
+   {
+    maxWait: 5000,
+    timeout: 15000,
+  },
+);
 
   if (result.changed) {
     for (const userId of result.recipientIds) {

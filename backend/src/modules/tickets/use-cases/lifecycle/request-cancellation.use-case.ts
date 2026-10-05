@@ -201,7 +201,12 @@ export async function requestCancellationUseCase(
       centerId: ticket.centerId,
       historyId: history.id,
     };
-  });
+    },
+    {
+      maxWait: 5000,
+      timeout: 15000,
+    }
+  );
 
   /*
    * Notify admins through the existing realtime notification

@@ -141,7 +141,13 @@ export async function cancelTicketUseCase(
 
       notifications: cancellation.notifications,
     };
-  });
+
+  },
+  {
+    maxWait: 5000,
+    timeout: 15000,
+  }
+);
 
   /*
    * Socket events happen after the transaction commits.

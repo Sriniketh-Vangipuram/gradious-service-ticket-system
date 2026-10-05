@@ -212,7 +212,12 @@ export async function rejectCancellationRequestUseCase(
           : [],
       notifications,
     };
-  });
+    },
+    {
+      maxWait: 5000,
+      timeout: 15000,
+    }
+  );
 
   for (const userId of [
     ...new Set(result.recipientIds),

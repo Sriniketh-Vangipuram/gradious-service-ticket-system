@@ -258,7 +258,12 @@ export async function reopenTicketUseCase(
       }),
       recipientIds,
     };
-  });
+    },
+    {
+      maxWait: 5000,
+      timeout: 15000,
+    }
+  );
   
   for (const userId of [...new Set(result.recipientIds)]) {
     publishToUser(userId, "ticket:reopened", {

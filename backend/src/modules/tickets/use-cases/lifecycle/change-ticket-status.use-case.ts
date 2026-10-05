@@ -295,7 +295,12 @@ export async function changeTicketStatusUseCase(
       }),
       previousStatus: ticket.status,
     };
-  });
+    },
+      {
+        maxWait: 5000,
+        timeout: 15000,
+      }
+  );
 
       const recipientIds = [
         result.ticket.requesterId,

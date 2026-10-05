@@ -173,7 +173,12 @@ export async function confirmTicketClosureUseCase(
         ...(ticket.assigneeId !== null ? [ticket.assigneeId] : []),
       ],
     };
-  });
+    },
+      {
+        maxWait: 5000,
+        timeout: 15000,
+      }
+    );
 
     for (const userId of [...new Set(result.recipientIds)]) {
     publishToUser(userId, "ticket:closed", {

@@ -252,7 +252,12 @@ export async function resolveTicketUseCase(
       }),
       recipientIds: [ticket.requesterId],
     };
-  });
+    },
+      {
+        maxWait: 5000,
+        timeout: 15000,
+      }
+    );
 
     for (const userId of [...new Set(result.recipientIds)]) {
     publishToUser(userId, "ticket:resolved", {

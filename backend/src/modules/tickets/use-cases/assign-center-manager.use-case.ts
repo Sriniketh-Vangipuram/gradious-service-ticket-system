@@ -344,7 +344,13 @@ export async function assignCenterManagerUseCase(
 
       changed: true,
     };
-  });
+  },
+    {
+      maxWait: 5000,
+      timeout: 15000,
+    },
+
+  );
 
   /*
    * Socket events happen after the DB transaction commits.

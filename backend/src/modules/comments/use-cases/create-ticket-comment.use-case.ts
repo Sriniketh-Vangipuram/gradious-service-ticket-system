@@ -41,7 +41,8 @@ export async function createTicketComment(
     ReturnType<typeof createNotifications>
   > = [];
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(
+    async (tx) => {
     // 1. Restrict the ticket lookup to tickets this actor may access.
     let ticketScope: Prisma.TicketWhereInput;
 
@@ -310,7 +311,12 @@ export async function createTicketComment(
         centerId: ticket.centerId,
       },
     };
-  });
+  },
+    {
+      maxWait: 5000,
+      timeout: 15000,
+    }
+  );
 
   for (const userId of result.recipientIds) {
     publishToUser(userId, "ticket:comment_created", {
