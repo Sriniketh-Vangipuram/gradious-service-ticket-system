@@ -4,16 +4,11 @@ export async function reserveTicketNumber(
     tx: Prisma.TransactionClient,
     year: number,
 ): Promise<string> {
-    const prefix = `GST-${year}-`;
-
     /*
-     * Ensure the yearly counter row exists.
+     * Ensure the yearly counter exists.
      *
-     * For an existing row, incrementing by 0 intentionally leaves
-     * the value unchanged while causing the database to touch the row.
-     *
-     * This happens inside the transaction, so subsequent operations
-     * use the same transaction context.
+     * The counter is the source of truth for generating
+     * the next ticket number.
      */
     await tx.ticketNumberCounter.upsert({
         where: {
@@ -25,110 +20,38 @@ export async function reserveTicketNumber(
             sequence: 0,
         },
 
-        update: {
-            sequence: {
-                increment: 0,
-            },
-        },
+        update: {},
     });
 
     /*
-     * Increment the counter first.
-     *
-     * This is the normal fast path.
+     * Atomically increment the yearly sequence.
      *
      * Example:
      *
-     * counter = 16
-     *        ↓
-     * counter = 17
+     * sequence = 17
+     *      ↓
+     * sequence = 18
      */
-    const incrementedCounter =
-        await tx.ticketNumberCounter.update({
-            where: {
-                year,
-            },
-
-            data: {
-                sequence: {
-                    increment: 1,
-                },
-            },
-
-            select: {
-                sequence: true,
-            },
-        });
-
-    let sequence = incrementedCounter.sequence;
-
-    /*
-     * Check the highest ticket number already stored for this year.
-     *
-     * Ticket numbers have a fixed-width numeric suffix:
-     *
-     * GST-2026-000001
-     * GST-2026-000002
-     * ...
-     *
-     * Therefore descending lexical order gives the highest
-     * existing sequence.
-     */
-    const latestTicket = await tx.ticket.findFirst({
+    const counter = await tx.ticketNumberCounter.update({
         where: {
-            ticketNumber: {
-                startsWith: prefix,
-            },
+            year,
         },
 
-        orderBy: {
-            ticketNumber: "desc",
+        data: {
+            sequence: {
+                increment: 1,
+            },
         },
 
         select: {
-            ticketNumber: true,
+            sequence: true,
         },
     });
 
-    if (latestTicket) {
-        const sequencePart =
-            latestTicket.ticketNumber.slice(prefix.length);
-
-        const existingMaxSequence =
-            Number.parseInt(sequencePart, 10);
-
-        if (
-            Number.isInteger(existingMaxSequence) &&
-            existingMaxSequence >= sequence
-        ) {
-            /*
-             * Counter drift detected.
-             *
-             * Example:
-             *
-             * Counter after increment = 16
-             * Existing highest ticket = 16
-             *
-             * We must move the counter to 17.
-             */
-            sequence = existingMaxSequence + 1;
-
-            await tx.ticketNumberCounter.update({
-                where: {
-                    year,
-                },
-
-                data: {
-                    sequence,
-                },
-            });
-        }
-    }
-
-    const formattedSequence = String(sequence).padStart(
+    const formattedSequence = String(counter.sequence).padStart(
         6,
         "0",
     );
 
-    return `${prefix}${formattedSequence}`;
+    return `GST-${year}-${formattedSequence}`;
 }

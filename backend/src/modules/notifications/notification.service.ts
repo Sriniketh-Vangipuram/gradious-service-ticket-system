@@ -4,7 +4,9 @@ import {
   PrismaClient,
 } from "../../generated/prisma/client";
 
-type NotificationDatabase = PrismaClient | Prisma.TransactionClient;
+type NotificationDatabase =
+  | PrismaClient
+  | Prisma.TransactionClient;
 
 type CreateNotificationsInput = {
   recipientIds: number[];
@@ -15,6 +17,16 @@ type CreateNotificationsInput = {
   dedupeKey?: string;
 };
 
+function isPrismaUniqueConstraintError(
+  error: unknown,
+): error is Prisma.PrismaClientKnownRequestError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "P2002"
+  );
+}
 
 export async function createNotifications(
   tx: NotificationDatabase,
@@ -26,11 +38,16 @@ export async function createNotifications(
     return [];
   }
 
-  // Find preferences explicitly disabled for this notification type.
+  /*
+   * Find notification preferences that explicitly disable
+   * this notification type.
+   */
   const disabledPreferences =
     await tx.notificationPreference.findMany({
       where: {
-        userId: { in: recipientIds },
+        userId: {
+          in: recipientIds,
+        },
         type: input.type,
         enabled: false,
       },
@@ -40,9 +57,15 @@ export async function createNotifications(
     });
 
   const disabledUserIds = new Set(
-    disabledPreferences.map((preference) => preference.userId),
+    disabledPreferences.map(
+      (preference) => preference.userId,
+    ),
   );
 
+  /*
+   * Only users who have not explicitly disabled this
+   * notification type should receive the notification.
+   */
   const eligibleRecipientIds = recipientIds.filter(
     (userId) => !disabledUserIds.has(userId),
   );
@@ -62,6 +85,15 @@ export async function createNotifications(
           title: input.title,
           message: input.message,
           ticketId: input.ticketId,
+
+          /*
+           * The same logical SLA alert gets the same dedupe
+           * key for each recipient.
+           *
+           * Example:
+           *
+           * ticket:42:first-response:breached:user:13
+           */
           dedupeKey: input.dedupeKey
             ? `${input.dedupeKey}:user:${userId}`
             : undefined,
@@ -69,13 +101,18 @@ export async function createNotifications(
       });
 
       createdNotifications.push(notification);
-    } catch (error) {
-      // Preserve the old skipDuplicates behavior for duplicate
-      // notification dedupe keys.
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+    } catch (error: unknown) {
+      /*
+       * SLA scans run every 60 seconds.
+       *
+       * If the same alert was already persisted, the unique
+       * dedupeKey constraint is expected and should be treated
+       * as an idempotent no-op.
+       *
+       * Do NOT let an already-existing notification fail the
+       * entire SLA scan.
+       */
+      if (isPrismaUniqueConstraintError(error)) {
         continue;
       }
 
