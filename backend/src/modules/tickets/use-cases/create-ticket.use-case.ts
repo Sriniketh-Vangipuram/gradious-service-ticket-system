@@ -20,7 +20,6 @@ import { createSuccessBody } from "../../../common/http/api-response";
 import { publishToUser } from "../../../socket/socket.server";
 import { createAuditLog } from "../../audit/audit.service";
 
-
 type AuthenticatedActor = {
   userId: number;
   role: UserRole;
@@ -42,7 +41,10 @@ export async function createTicketUseCase(
   actor: AuthenticatedActor,
   idempotencyKey: string,
 ) {
-  // 1. Verify the actor's role.
+  // ============================================================
+  // 1. Request-level authorization
+  // ============================================================
+
   const allowedRoles: string[] = [
     UserRole.EMPLOYEE,
     UserRole.TECHNICIAN,
@@ -57,9 +59,6 @@ export async function createTicketUseCase(
     );
   }
 
-  // 2. Enforce priority policy.
-  // Employees may choose LOW, MEDIUM, or HIGH.
-  // CRITICAL is reserved for staff.
   if (
     actor.role === UserRole.EMPLOYEE &&
     input.priority === "CRITICAL"
@@ -74,21 +73,323 @@ export async function createTicketUseCase(
     .update(JSON.stringify(input))
     .digest("hex");
 
-  let eventRecipientIds: number[] = [];
+  /*
+   * ============================================================
+   * 2. PREFLIGHT VALIDATION
+   *
+   * These operations are read-only and do not need to hold an
+   * interactive transaction open.
+   *
+   * This is intentionally outside the transaction to keep the
+   * atomic transaction short and predictable.
+   * ============================================================
+   */
 
-  let createdNotifications: Array<{
-    id: number;
-    userId: number;
-    type: NotificationType;
-    title: string;
-    message: string;
-    ticketId: number | null;
-    createdAt: Date;
-  }> = [];
+  const requester = await prisma.user.findUnique({
+    where: {
+      id: actor.userId,
+    },
+    select: {
+      id: true,
+      isActive: true,
+      role: true,
+      centerId: true,
+      labId: true,
+    },
+  });
+
+  if (!requester || !requester.isActive) {
+    throw new AppError(
+      "UNAUTHENTICATED",
+      "Your account is not available.",
+    );
+  }
+
+  if (requester.role !== actor.role) {
+    throw new AppError(
+      "FORBIDDEN",
+      "Your account permissions have changed. Please sign in again.",
+    );
+  }
+
+  // ------------------------------------------------------------
+  // Resolve center and lab
+  // ------------------------------------------------------------
+
+  let ticketCenterId: number;
+  let ticketLabId: number;
+
+  if (requester.role === UserRole.EMPLOYEE) {
+    if (requester.centerId === null) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "You are not assigned to a center. Please contact an administrator.",
+      );
+    }
+
+    if (requester.labId === null) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "You are not assigned to a lab. Please contact your center manager.",
+      );
+    }
+
+    ticketCenterId = requester.centerId;
+    ticketLabId = requester.labId;
+  } else {
+    if (input.centerId === undefined) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "A center is required when creating a ticket.",
+        [
+          {
+            field: "body.centerId",
+            message: "Choose a center.",
+          },
+        ],
+      );
+    }
+
+    if (input.labId === undefined) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "A lab is required when creating a ticket.",
+        [
+          {
+            field: "body.labId",
+            message: "Choose a lab.",
+          },
+        ],
+      );
+    }
+
+    ticketCenterId = input.centerId;
+    ticketLabId = input.labId;
+  }
+
+  // ------------------------------------------------------------
+  // Verify center
+  // ------------------------------------------------------------
+
+  const center = await prisma.center.findUnique({
+    where: {
+      id: ticketCenterId,
+    },
+    select: {
+      id: true,
+      isActive: true,
+    },
+  });
+
+  if (!center || !center.isActive) {
+    throw new AppError(
+      "NOT_FOUND",
+      "The selected center was not found or is inactive.",
+    );
+  }
+
+  // ------------------------------------------------------------
+  // Verify center access
+  // ------------------------------------------------------------
+
+  if (requester.role !== UserRole.ADMIN) {
+    const centerAccess = await prisma.userCenter.findUnique({
+      where: {
+        userId_centerId: {
+          userId: requester.id,
+          centerId: ticketCenterId,
+        },
+      },
+      select: {
+        userId: true,
+      },
+    });
+
+    if (!centerAccess) {
+      throw new AppError(
+        "FORBIDDEN",
+        "You are not authorized to create tickets for this center.",
+      );
+    }
+  }
+
+  // ------------------------------------------------------------
+  // Verify lab
+  // ------------------------------------------------------------
+
+  const lab = await prisma.lab.findFirst({
+    where: {
+      id: ticketLabId,
+      centerId: ticketCenterId,
+      isActive: true,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!lab) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "The selected lab is invalid or does not belong to the selected center.",
+      [
+        {
+          field: "body.labId",
+          message:
+            "Choose an active lab belonging to the selected center.",
+        },
+      ],
+    );
+  }
+
+  // ------------------------------------------------------------
+  // Verify category
+  // ------------------------------------------------------------
+
+  const category = await prisma.category.findUnique({
+    where: {
+      id: input.categoryId,
+    },
+    select: {
+      id: true,
+      code: true,
+      isActive: true,
+    },
+  });
+
+  if (!category || !category.isActive) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "The selected category is invalid or inactive.",
+      [
+        {
+          field: "body.categoryId",
+          message: "Choose an active category.",
+        },
+      ],
+    );
+  }
+
+  // ------------------------------------------------------------
+  // Enforce software-specific fields
+  // ------------------------------------------------------------
+
+  const isSoftwareCategory = category.code === "SOFTWARE";
+
+  const hasSoftwareFields =
+    input.softwareId !== undefined &&
+    input.requestType !== undefined;
+
+  if (isSoftwareCategory && !hasSoftwareFields) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Software requests require a software selection and request type.",
+      [
+        {
+          field: "body.softwareId",
+          message:
+            "Required for software-category tickets.",
+        },
+        {
+          field: "body.requestType",
+          message:
+            "Required for software-category tickets.",
+        },
+      ],
+    );
+  }
+
+  if (!isSoftwareCategory && hasSoftwareFields) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Software fields are only allowed for software-category tickets.",
+      [
+        {
+          field: "body.categoryId",
+          message:
+            "Software fields require the SOFTWARE category.",
+        },
+      ],
+    );
+  }
+
+  // ------------------------------------------------------------
+  // Verify software
+  // ------------------------------------------------------------
+
+  if (input.softwareId !== undefined) {
+    const software = await prisma.software.findUnique({
+      where: {
+        id: input.softwareId,
+      },
+      select: {
+        id: true,
+        isActive: true,
+      },
+    });
+
+    if (!software || !software.isActive) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "The selected software is invalid or inactive.",
+        [
+          {
+            field: "body.softwareId",
+            message:
+              "Choose active software from the catalog.",
+          },
+        ],
+      );
+    }
+  }
+
+  /*
+   * ============================================================
+   * 3. SLA CALCULATION
+   *
+   * These are read/calculation operations, so they happen before
+   * the transaction.
+   * ============================================================
+   */
+
+  const slaPolicy = await getActiveSlaPolicy(
+    input.priority,
+    prisma,
+  );
+
+  const slaStartedAt = new Date();
+
+  const firstResponseDueAt = await addBusinessMinutes({
+    startAt: slaStartedAt,
+    businessMinutes: slaPolicy.firstResponseMinutes,
+    centerId: ticketCenterId,
+    db: prisma,
+  });
+
+  const resolutionDueAt = await addBusinessMinutes({
+    startAt: slaStartedAt,
+    businessMinutes: slaPolicy.resolutionMinutes,
+    centerId: ticketCenterId,
+    db: prisma,
+  });
+
+  /*
+   * ============================================================
+   * 4. SHORT ATOMIC TRANSACTION
+   *
+   * Only operations that must succeed together remain here.
+   *
+   * Ticket number + ticket + history + SLA cycle + audit +
+   * idempotency response are kept atomic.
+   * ============================================================
+   */
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // 3. Reserve the idempotency key.
+      // --------------------------------------------------------
+      // Idempotency reservation
+      // --------------------------------------------------------
+
       await tx.idempotencyRecord.create({
         data: {
           userId: actor.userId,
@@ -100,287 +401,10 @@ export async function createTicketUseCase(
         },
       });
 
-      // 4. Confirm the requester exists, is active,
-      //    and still has the role represented by the actor.
-      const requester = await tx.user.findUnique({
-        where: {
-          id: actor.userId,
-        },
-        select: {
-          id: true,
-          isActive: true,
-          role: true,
+      // --------------------------------------------------------
+      // Reserve ticket number
+      // --------------------------------------------------------
 
-          // Required for employee-created tickets.
-          centerId: true,
-          labId: true,
-        },
-      });
-
-      if (!requester || !requester.isActive) {
-        throw new AppError(
-          "UNAUTHENTICATED",
-          "Your account is not available.",
-        );
-      }
-
-      // Use the database role, not only the JWT role.
-      if (requester.role !== actor.role) {
-        throw new AppError(
-          "FORBIDDEN",
-          "Your account permissions have changed. Please sign in again.",
-        );
-      }
-
-      /*
-       * 5. Resolve the ticket's center and lab.
-       *
-       * Employees do NOT choose these values.
-       * They are derived from the employee's organizational assignment.
-       *
-       * Staff users continue using the explicit center/lab supplied
-       * in the request for now.
-       */
-      let ticketCenterId: number;
-      let ticketLabId: number;
-
-      if (requester.role === UserRole.EMPLOYEE) {
-        if (requester.centerId === null) {
-          throw new AppError(
-            "VALIDATION_ERROR",
-            "You are not assigned to a center. Please contact an administrator.",
-          );
-        }
-
-        if (requester.labId === null) {
-          throw new AppError(
-            "VALIDATION_ERROR",
-            "You are not assigned to a lab. Please contact your center manager.",
-          );
-        }
-
-        ticketCenterId = requester.centerId;
-        ticketLabId = requester.labId;
-      } else {
-        if (input.centerId === undefined) {
-          throw new AppError(
-            "VALIDATION_ERROR",
-            "A center is required when creating a ticket.",
-            [
-              {
-                field: "body.centerId",
-                message: "Choose a center.",
-              },
-            ],
-          );
-        }
-
-        if (input.labId === undefined) {
-          throw new AppError(
-            "VALIDATION_ERROR",
-            "A lab is required when creating a ticket.",
-            [
-              {
-                field: "body.labId",
-                message: "Choose a lab.",
-              },
-            ],
-          );
-        }
-
-        ticketCenterId = input.centerId;
-        ticketLabId = input.labId;
-      }
-
-      // 6. Verify the resolved center exists and is active.
-      const center = await tx.center.findUnique({
-        where: {
-          id: ticketCenterId,
-        },
-        select: {
-          id: true,
-          isActive: true,
-        },
-      });
-
-      if (!center || !center.isActive) {
-        throw new AppError(
-          "NOT_FOUND",
-          "The selected center was not found or is inactive.",
-        );
-      }
-
-      /*
-       * 7. Non-admin users must have explicit center access.
-       *
-       * For employees this is an additional authorization check
-       * around their assigned center.
-       */
-      if (requester.role !== UserRole.ADMIN) {
-        const centerAccess = await tx.userCenter.findUnique({
-          where: {
-            userId_centerId: {
-              userId: requester.id,
-              centerId: ticketCenterId,
-            },
-          },
-          select: {
-            userId: true,
-          },
-        });
-
-        if (!centerAccess) {
-          throw new AppError(
-            "FORBIDDEN",
-            "You are not authorized to create tickets for this center.",
-          );
-        }
-      }
-
-      // 8. Verify the resolved lab belongs to the resolved center
-      //    and is active.
-      const lab = await tx.lab.findFirst({
-        where: {
-          id: ticketLabId,
-          centerId: ticketCenterId,
-          isActive: true,
-        },
-        select: {
-          id: true,
-        },
-      });
-
-      if (!lab) {
-        throw new AppError(
-          "VALIDATION_ERROR",
-          "The selected lab is invalid or does not belong to the selected center.",
-          [
-            {
-              field: "body.labId",
-              message:
-                "Choose an active lab belonging to the selected center.",
-            },
-          ],
-        );
-      }
-
-      // 9. Verify category exists and is active.
-      const category = await tx.category.findUnique({
-        where: {
-          id: input.categoryId,
-        },
-        select: {
-          id: true,
-          code: true,
-          isActive: true,
-        },
-      });
-
-      if (!category || !category.isActive) {
-        throw new AppError(
-          "VALIDATION_ERROR",
-          "The selected category is invalid or inactive.",
-          [
-            {
-              field: "body.categoryId",
-              message: "Choose an active category.",
-            },
-          ],
-        );
-      }
-
-      // 10. Enforce software-specific fields using category.code.
-      const isSoftwareCategory = category.code === "SOFTWARE";
-
-      const hasSoftwareFields =
-        input.softwareId !== undefined &&
-        input.requestType !== undefined;
-
-      if (isSoftwareCategory && !hasSoftwareFields) {
-        throw new AppError(
-          "VALIDATION_ERROR",
-          "Software requests require a software selection and request type.",
-          [
-            {
-              field: "body.softwareId",
-              message:
-                "Required for software-category tickets.",
-            },
-            {
-              field: "body.requestType",
-              message:
-                "Required for software-category tickets.",
-            },
-          ],
-        );
-      }
-
-      if (!isSoftwareCategory && hasSoftwareFields) {
-        throw new AppError(
-          "VALIDATION_ERROR",
-          "Software fields are only allowed for software-category tickets.",
-          [
-            {
-              field: "body.categoryId",
-              message:
-                "Software fields require the SOFTWARE category.",
-            },
-          ],
-        );
-      }
-
-      // 11. Verify selected software exists and is active.
-      if (input.softwareId !== undefined) {
-        const software = await tx.software.findUnique({
-          where: {
-            id: input.softwareId,
-          },
-          select: {
-            id: true,
-            isActive: true,
-          },
-        });
-
-        if (!software || !software.isActive) {
-          throw new AppError(
-            "VALIDATION_ERROR",
-            "The selected software is invalid or inactive.",
-            [
-              {
-                field: "body.softwareId",
-                message:
-                  "Choose active software from the catalog.",
-              },
-            ],
-          );
-        }
-      }
-
-      // 12. Load the active SLA policy.
-      const slaPolicy = await getActiveSlaPolicy(
-        input.priority,
-        tx,
-      );
-
-      // Use one consistent start timestamp for SLA calculations.
-      const slaStartedAt = new Date();
-
-      // Calculate deadlines using the resolved center.
-      const firstResponseDueAt = await addBusinessMinutes({
-        startAt: slaStartedAt,
-        businessMinutes: slaPolicy.firstResponseMinutes,
-        centerId: ticketCenterId,
-        db: tx,
-      });
-
-      const resolutionDueAt = await addBusinessMinutes({
-        startAt: slaStartedAt,
-        businessMinutes: slaPolicy.resolutionMinutes,
-        centerId: ticketCenterId,
-        db: tx,
-      });
-
-      // 13. Reserve yearly sequential ticket number.
       const year = new Date().getFullYear();
 
       const ticketNumber = await reserveTicketNumber(
@@ -388,12 +412,10 @@ export async function createTicketUseCase(
         year,
       );
 
-      // 14. Create ticket.
-      //
-      // Important:
-      // - requesterId comes from authentication.
-      // - centerId/labId come from the resolved assignment.
-      // - assigneeId is intentionally NOT provided.
+      // --------------------------------------------------------
+      // Create ticket
+      // --------------------------------------------------------
+
       const ticket = await tx.ticket.create({
         data: {
           ticketNumber,
@@ -441,19 +463,13 @@ export async function createTicketUseCase(
           softwareId: true,
           createdAt: true,
           updatedAt: true,
-        }
+        },
       });
 
-      console.log(
-          "[TicketCreate] ticket returned from Prisma:",
-          ticket,
-      );
+      // --------------------------------------------------------
+      // Required ticket history
+      // --------------------------------------------------------
 
-      if (!ticket) {
-          throw new Error(
-            "DEBUG: tx.ticket.create() returned null",
-          );
-      }
       await tx.ticketHistory.create({
         data: {
           ticketId: ticket.id,
@@ -464,60 +480,110 @@ export async function createTicketUseCase(
         },
       });
 
+      // --------------------------------------------------------
+      // Initial SLA cycle
+      // --------------------------------------------------------
+
       await tx.ticketSlaCycle.create({
         data: {
-          ticketId:ticket.id,
-          cycleNumber:1,
-          startedAt:slaStartedAt,
-          dueAt:resolutionDueAt,
-          targetMinutes:slaPolicy.resolutionMinutes,
-          atRiskThresholdPercent:slaPolicy.atRiskThresholdPercent,
-        }
-      })
+          ticketId: ticket.id,
+          cycleNumber: 1,
+          startedAt: slaStartedAt,
+          dueAt: resolutionDueAt,
+          targetMinutes: slaPolicy.resolutionMinutes,
+          atRiskThresholdPercent:
+            slaPolicy.atRiskThresholdPercent,
+        },
+      });
+
+      // --------------------------------------------------------
+      // Audit log
+      // --------------------------------------------------------
 
       await createAuditLog(
-          {
-            action: "TICKET_CREATED",
-            entityType: "TICKET",
-            entityId: String(ticket.id),
-            actorId: requester.id,
+        {
+          action: "TICKET_CREATED",
+          entityType: "TICKET",
+          entityId: String(ticket.id),
+          actorId: requester.id,
 
-            newValue: {
-              ticketNumber: ticket.ticketNumber,
-              title: ticket.title,
-              description: ticket.description,
-              status: ticket.status,
-              priority: ticket.priority,
-              requestType: ticket.requestType,
-              requesterId: ticket.requesterId,
-              centerId: ticket.centerId,
-              labId: ticket.labId,
-              categoryId: ticket.categoryId,
-              softwareId: ticket.softwareId,
-              firstResponseDueAt,
-              resolutionDueAt,
-              firstResponseTargetMinutes:
-                slaPolicy.firstResponseMinutes,
-              resolutionTargetMinutes:
-                slaPolicy.resolutionMinutes,
-              atRiskThresholdPercent:
-                slaPolicy.atRiskThresholdPercent,
-            },
-
-            metadata: {
-              source: "TICKET_CREATION",
-              slaPolicyPriority: input.priority,
-            },
+          newValue: {
+            ticketNumber: ticket.ticketNumber,
+            title: ticket.title,
+            description: ticket.description,
+            status: ticket.status,
+            priority: ticket.priority,
+            requestType: ticket.requestType,
+            requesterId: ticket.requesterId,
+            centerId: ticket.centerId,
+            labId: ticket.labId,
+            categoryId: ticket.categoryId,
+            softwareId: ticket.softwareId,
+            firstResponseDueAt,
+            resolutionDueAt,
+            firstResponseTargetMinutes:
+              slaPolicy.firstResponseMinutes,
+            resolutionTargetMinutes:
+              slaPolicy.resolutionMinutes,
+            atRiskThresholdPercent:
+              slaPolicy.atRiskThresholdPercent,
           },
-          tx,
-        );
 
-      // 15. Find active staff members who have access
-      //     to the ticket's center.
+          metadata: {
+            source: "TICKET_CREATION",
+            slaPolicyPriority: input.priority,
+          },
+        },
+        tx,
+      );
+
+      // --------------------------------------------------------
+      // Store idempotent response
+      // --------------------------------------------------------
+
+      const responseBody = createSuccessBody({
+        ticket,
+      });
+
+      await tx.idempotencyRecord.update({
+        where: {
+          userId_key: {
+            userId: actor.userId,
+            key: idempotencyKey,
+          },
+        },
+        data: {
+          responseStatus: 201,
+          responseBody,
+        },
+      });
+
+      return {
+        ticket,
+        replayed: false,
+        responseStatus: 201,
+        responseBody,
+      };
+    });
+
+    /*
+     * ============================================================
+     * 5. POST-COMMIT SIDE EFFECTS
+     *
+     * These happen only after the ticket transaction commits.
+     *
+     * Failure here must NOT turn a successfully-created ticket
+     * into an HTTP 500 response.
+     * ============================================================
+     */
+
+    let eventRecipientIds: number[] = [];
+
+    try {
       const staffMemberships =
-        await tx.userCenter.findMany({
+        await prisma.userCenter.findMany({
           where: {
-            centerId: ticketCenterId,
+            centerId: result.ticket.centerId,
             user: {
               isActive: true,
               role: {
@@ -537,51 +603,21 @@ export async function createTicketUseCase(
         (membership) => membership.userId,
       );
 
-      // 16. Persist ticket-created notifications atomically.
-      createdNotifications = await createNotifications(tx, {
-        recipientIds: [
-          requester.id,
-          ...staffRecipientIds,
-        ],
-        type: NotificationType.TICKET_CREATED,
-        title: "New service ticket created",
-        message: `Ticket ${ticket.ticketNumber}-${ticket.title} has been created.`,
-        ticketId: ticket.id,
-      });
-
-      const responseBody = createSuccessBody({
-        ticket,
-      });
-
-      // 17. Store idempotent response.
-      await tx.idempotencyRecord.update({
-        where: {
-          userId_key: {
-            userId: actor.userId,
-            key: idempotencyKey,
-          },
-        },
-        data: {
-          responseStatus: 201,
-          responseBody,
-        },
-      });
-
       eventRecipientIds = [
         requester.id,
         ...staffRecipientIds,
       ];
 
-      return {
-        ticket,
-        replayed: false,
-        responseStatus: 201,
-        responseBody,
-      };
-    });
+      const createdNotifications =
+        await createNotifications(prisma, {
+          recipientIds: eventRecipientIds,
+          type: NotificationType.TICKET_CREATED,
+          title: "New service ticket created",
+          message: `Ticket ${result.ticket.ticketNumber}-${result.ticket.title} has been created.`,
+          ticketId: result.ticket.id,
+        });
 
-    // 18. Publish realtime ticket event.
-    if (!result.replayed) {
+      // Ticket realtime event
       for (const userId of eventRecipientIds) {
         publishToUser(userId, "ticket:created", {
           ticketId: result.ticket.id,
@@ -591,10 +627,8 @@ export async function createTicketUseCase(
           createdAt: result.ticket.createdAt,
         });
       }
-    }
 
-    // 19. Publish notification events.
-    if (!result.replayed) {
+      // Notification realtime events
       for (const notification of createdNotifications) {
         publishToUser(
           notification.userId,
@@ -609,6 +643,16 @@ export async function createTicketUseCase(
           },
         );
       }
+    } catch (error: unknown) {
+      /*
+       * The ticket has already committed successfully.
+       * Notification/socket failure must not change the HTTP
+       * result into an unsuccessful ticket creation.
+       */
+      console.error(
+        "[TicketCreate] Post-commit notification/event processing failed:",
+        error,
+      );
     }
 
     return result;
@@ -617,8 +661,12 @@ export async function createTicketUseCase(
       throw error;
     }
 
-    // The transaction has failed and rolled back.
-    // Check whether this user/key already has a committed record.
+    /*
+     * ============================================================
+     * 6. IDEMPOTENCY REPLAY
+     * ============================================================
+     */
+
     const existingRecord =
       await prisma.idempotencyRecord.findUnique({
         where: {
@@ -634,7 +682,7 @@ export async function createTicketUseCase(
         },
       });
 
-    // A different unique constraint may have caused P2002.
+    // A different unique constraint caused the P2002.
     if (!existingRecord) {
       throw error;
     }
@@ -646,8 +694,6 @@ export async function createTicketUseCase(
       );
     }
 
-    // A committed record should contain the response because
-    // the record and response are written in the same transaction.
     if (
       existingRecord.responseStatus === null ||
       existingRecord.responseBody === null
