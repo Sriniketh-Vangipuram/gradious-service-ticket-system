@@ -495,4 +495,12 @@ export const cancellationRequestReviewParamsSchema =
     historyId: z.coerce.number().int().positive(),
   }).strict();
 
-  
+export const requestInformationBodySchema = z
+  .object({
+    comment: z.string().trim().min(1).max(5000),
+  })
+  .strict();
+
+export type RequestInformationBody = z.infer<
+  typeof requestInformationBodySchema
+>;

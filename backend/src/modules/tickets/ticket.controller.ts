@@ -10,6 +10,7 @@ import { listTicketsUseCase } from "./use-cases/list-tickets.use-case";
 import {
   updateTicketParamsSchema,
   updateTicketBodySchema,
+  requestInformationBodySchema,
 } from "./ticket.schemas";
 import {
   approveCancellationRequestUseCase,
@@ -51,6 +52,7 @@ import {
 } from "./use-cases/assign-center-manager.use-case";
 
 import { assignTechnicianUseCase } from "./use-cases/assign-technician.use-case";
+import { requestInformationUseCase } from "./use-cases/request-information.use-case";
 
 
 
@@ -665,6 +667,45 @@ export async function rejectCancellationRequestController(
       success: true,
       data: result,
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function requestInformationController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { ticketId } = getValidatedData(
+      req,
+      { params: ticketIdParamsSchema },
+      "params",
+    );
+
+    const body = getValidatedData(
+      req,
+      { body: requestInformationBodySchema },
+      "body",
+    );
+
+    const actor = req.authUser;
+
+    if (!actor) {
+      throw new AppError(
+        "UNAUTHENTICATED",
+        "Authentication required.",
+      );
+    }
+
+    const result = await requestInformationUseCase(
+      ticketId,
+      body,
+      actor,
+    );
+
+    sendSuccess(res, result);
   } catch (error) {
     next(error);
   }

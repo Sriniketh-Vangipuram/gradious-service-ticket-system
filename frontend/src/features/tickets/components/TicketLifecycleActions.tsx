@@ -7,9 +7,11 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+
 import { useCancelTicket } from "../hooks/useCancelTicket";
 import type { AuthUser } from "../../auth/types/auth.types";
 import type { Ticket } from "../types/ticket.types";
+import { useRequestTicketInformation } from "../../comments/hooks/useCreateTicketComment";
 
 import {
   canCancelTicket,
@@ -23,6 +25,7 @@ import {
   useRejectTicketCancellation,
   useRequestTicketCancellation,
 } from "../hooks/useCancellation";
+
 import { useChangeTicketStatus } from "../hooks/useChangeTicketStatus";
 import { useConfirmTicketClosure } from "../hooks/useConfirmTicketClosure";
 import { useReopenTicket } from "../hooks/useReopenTicket";
@@ -46,6 +49,9 @@ export function TicketLifecycleActions({
   const [rejectionReason, setRejectionReason] =
     useState("");
 
+  const [requestInformationComment, setRequestInformationComment] =
+    useState("");
+
   const cancelMutation = useCancelTicket();
 
   const requestCancellationMutation =
@@ -61,8 +67,15 @@ export function TicketLifecycleActions({
     useConfirmTicketClosure();
 
   const reopenMutation = useReopenTicket();
-  const changeStatusMutation = useChangeTicketStatus();
-  const resolveMutation = useResolveTicket();
+
+  const changeStatusMutation =
+    useChangeTicketStatus();
+
+  const resolveMutation =
+    useResolveTicket();
+
+  const requestInformationMutation =
+    useRequestTicketInformation();
 
   const canCancel = canCancelTicket(
     currentUser,
@@ -92,7 +105,7 @@ export function TicketLifecycleActions({
     currentUser.role === "ADMIN";
 
   const cancellationRequest =
-  ticket.cancellationRequest;
+    ticket.cancellationRequest;
 
   const hasPendingCancellationRequest =
     cancellationRequest?.status === "PENDING";
@@ -100,7 +113,6 @@ export function TicketLifecycleActions({
   const canReviewCancellation =
     isAdmin &&
     cancellationRequest?.status === "PENDING";
-  
 
   const canStartWork =
     isTechnician &&
@@ -193,60 +205,61 @@ export function TicketLifecycleActions({
     };
 
   const handleApproveCancellation = async () => {
-  if (!cancellationRequest) {
-    return;
-  }
+    if (!cancellationRequest) {
+      return;
+    }
 
-  try {
-    await approveCancellationMutation.mutateAsync({
-      ticketId: ticket.id,
-      historyId: cancellationRequest.id,
-    });
+    try {
+      await approveCancellationMutation.mutateAsync({
+        ticketId: ticket.id,
+        historyId: cancellationRequest.id,
+      });
 
-    toast.success(
-      "Cancellation request approved.",
-    );
-  } catch {
-    toast.error(
-      "Unable to approve the cancellation request. Please refresh and try again.",
-    );
-  }
-};
+      toast.success(
+        "Cancellation request approved.",
+      );
+    } catch {
+      toast.error(
+        "Unable to approve the cancellation request. Please refresh and try again.",
+      );
+    }
+  };
 
- const handleRejectCancellation = async () => {
-  const reason = rejectionReason.trim();
+  const handleRejectCancellation = async () => {
+    const reason =
+      rejectionReason.trim();
 
-  if (!cancellationRequest) {
-    return;
-  }
+    if (!cancellationRequest) {
+      return;
+    }
 
-  if (!reason) {
-    toast.error(
-      "Please provide a reason for rejecting the cancellation request.",
-    );
-    return;
-  }
+    if (!reason) {
+      toast.error(
+        "Please provide a reason for rejecting the cancellation request.",
+      );
+      return;
+    }
 
-  try {
-    await rejectCancellationMutation.mutateAsync({
-      ticketId: ticket.id,
-      historyId: cancellationRequest.id,
-      payload: {
-        reason,
-      },
-    });
+    try {
+      await rejectCancellationMutation.mutateAsync({
+        ticketId: ticket.id,
+        historyId: cancellationRequest.id,
+        payload: {
+          reason,
+        },
+      });
 
-    setRejectionReason("");
+      setRejectionReason("");
 
-    toast.success(
-      "Cancellation request rejected.",
-    );
-  } catch {
-    toast.error(
-      "Unable to reject the cancellation request. Please refresh and try again.",
-    );
-  }
-};
+      toast.success(
+        "Cancellation request rejected.",
+      );
+    } catch {
+      toast.error(
+        "Unable to reject the cancellation request. Please refresh and try again.",
+      );
+    }
+  };
 
   const handleConfirmClosure =
     async () => {
@@ -315,25 +328,36 @@ export function TicketLifecycleActions({
     }
   };
 
-  const handleRequestInformation =
-    async () => {
-      try {
-        await changeStatusMutation.mutateAsync({
-          ticketId: ticket.id,
-          payload: {
-            status: "WAITING_FOR_USER",
-          },
-        });
+  const handleRequestInformation = async () => {
+    const trimmedComment =
+      requestInformationComment.trim();
 
-        toast.success(
-          "Ticket is now waiting for user information.",
-        );
-      } catch {
-        toast.error(
-          "Unable to request information. Please refresh and try again.",
-        );
-      }
-    };
+    if (!trimmedComment) {
+      toast.error(
+        "Please explain what information is required from the requester.",
+      );
+      return;
+    }
+
+    try {
+      await requestInformationMutation.mutateAsync({
+        ticketId: ticket.id,
+        payload: {
+          comment: trimmedComment,
+        },
+      });
+
+      setRequestInformationComment("");
+
+      toast.success(
+        "Information requested from the user.",
+      );
+    } catch {
+      toast.error(
+        "Unable to request information. Please refresh and try again.",
+      );
+    }
+  };
 
   const handleResolve = async () => {
     const trimmedResolution =
@@ -374,6 +398,7 @@ export function TicketLifecycleActions({
     confirmClosureMutation.isPending ||
     reopenMutation.isPending ||
     changeStatusMutation.isPending ||
+    requestInformationMutation.isPending ||
     resolveMutation.isPending;
 
   return (
@@ -684,22 +709,55 @@ export function TicketLifecycleActions({
             </p>
 
             <p className="mt-1 text-xs leading-5 text-amber-200/60">
-              Move the ticket to waiting for user. Add a public
-              comment below explaining what information is required.
+              Explain what information, screenshots, files, or
+              other details the requester needs to provide. This
+              will be posted as a public comment and the ticket
+              will move to waiting for user.
             </p>
 
-            <button
-              type="button"
-              onClick={() =>
-                void handleRequestInformation()
-              }
-              disabled={isSubmitting}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-amber-400/70"
+            <label
+              htmlFor="ticket-request-information"
+              className="mt-4 block text-xs font-medium text-slate-300"
             >
-              {changeStatusMutation.isPending
-                ? "Updating..."
-                : "Request information"}
-            </button>
+              Information required
+            </label>
+
+            <textarea
+              id="ticket-request-information"
+              value={requestInformationComment}
+              onChange={(event) =>
+                setRequestInformationComment(
+                  event.target.value,
+                )
+              }
+              rows={4}
+              maxLength={5000}
+              placeholder="Example: Please provide a screenshot of the error message and the software license key..."
+              disabled={isSubmitting}
+              className="mt-2 w-full resize-y rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm text-slate-200 outline-none transition placeholder:text-slate-600 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <span className="text-xs text-slate-600">
+                {requestInformationComment.length}/5000
+              </span>
+
+              <button
+                type="button"
+                onClick={() =>
+                  void handleRequestInformation()
+                }
+                disabled={
+                  isSubmitting ||
+                  !requestInformationComment.trim()
+                }
+                className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-amber-400/70"
+              >
+                {requestInformationMutation.isPending
+                  ? "Requesting..."
+                  : "Request information"}
+              </button>
+            </div>
           </div>
         ) : null}
 

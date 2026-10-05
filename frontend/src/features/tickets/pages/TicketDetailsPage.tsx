@@ -18,7 +18,7 @@ import { TicketLifecycleActions } from "../components/TicketLifecycleActions";
 import { useTicket } from "../hooks/useTickets";
 import { TicketComments } from "../../comments/components/TicketComments";
 import { useCurrentUser } from "../../auth/hooks/useCurrentUser";
-import { canRespondToTicket } from "../ticket.permissions";
+import { canCommentOnTicket } from "../ticket.permissions";
 import { TicketAssignmentPanel } from "../components/TicketAssignmentPanel";
 
 interface TicketDetailsNavigationState {
@@ -782,7 +782,7 @@ export function TicketDetailsPage() {
           currentUser={currentUser}
           canRespond={
             currentUser
-              ? canRespondToTicket(
+              ? canCommentOnTicket(
                   currentUser,
                   ticket,
                 )

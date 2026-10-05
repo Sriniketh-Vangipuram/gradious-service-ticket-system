@@ -1,850 +1,651 @@
 # Gradious Service Ticket System
 
-A production-oriented full-stack IT Service Ticket Management System designed to manage software installation and IT support requests across multiple centers and labs.
+A production-oriented **IT Service Desk and Ticket Management Platform** designed to manage software installation, update, uninstallation, licensing, and technical support requests across multiple centers and labs.
 
-The system provides role-based access, ticket lifecycle management, SLA monitoring, notifications, audit logging, service catalog management, and operational analytics.
-
----
-
-## Table of Contents
-
-* [Overview](#overview)
-* [Key Features](#key-features)
-* [User Roles](#user-roles)
-* [Ticket Lifecycle](#ticket-lifecycle)
-* [Technology Stack](#technology-stack)
-* [System Architecture](#system-architecture)
-* [Project Structure](#project-structure)
-* [Backend Modules](#backend-modules)
-* [Frontend Modules](#frontend-modules)
-* [Authentication and Authorization](#authentication-and-authorization)
-* [Ticket and Comment Visibility](#ticket-and-comment-visibility)
-* [SLA Management](#sla-management)
-* [Analytics](#analytics)
-* [API Overview](#api-overview)
-* [Database](#database)
-* [Environment Variables](#environment-variables)
-* [Local Development](#local-development)
-* [Production Build](#production-build)
-* [Security](#security)
-* [Engineering Practices](#engineering-practices)
-* [Future Improvements](#future-improvements)
-* [Author](#author)
+The system implements role-based access control, ticket lifecycle management, technician assignment, SLA monitoring, public and internal communication, notifications, audit history, realtime updates, idempotent ticket creation, and administrative analytics.
 
 ---
 
-## Overview
+## 📌 Overview
 
-The **Gradious Service Ticket System** is an internal IT service management platform for organizations operating across multiple centers and laboratories.
+The Gradious Service Ticket System models a real-world internal IT service desk.
 
-Employees can submit IT/software-related requests, while technicians and management teams can manage, assign, track, resolve, and monitor those requests.
+Employees can raise service requests and track their progress, while technicians, center managers, and administrators manage tickets according to their responsibilities.
 
-The platform was designed around real-world service management requirements rather than simple CRUD operations.
+The application is built around explicit business rules and controlled ticket lifecycle transitions rather than simple CRUD operations.
 
-It supports:
+### Core workflow
 
-* Multi-center organizations
-* Role-based access control
-* Ticket assignment and lifecycle management
-* Software/service catalog management
-* SLA tracking
-* Internal and public ticket communication
-* Notifications
-* Audit trails
-* Operational analytics
-* Technician workload monitoring
+```text
+Employee
+   │
+   │ Create Service Request
+   ▼
+┌─────────────┐
+│    OPEN     │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│   TRIAGED   │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│  ASSIGNED   │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│ IN_PROGRESS │◄──────────────┐
+└──────┬──────┘               │
+       │                      │
+       │ Request Information  │
+       ▼                      │
+┌──────────────────┐          │
+│ WAITING_FOR_USER │──────────┘
+└──────────────────┘
+       │
+       ▼
+┌─────────────┐
+│  RESOLVED   │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│    CLOSED   │
+└─────────────┘
+```
 
----
-
-## Key Features
-
-### Authentication
-
-* Secure employee registration
-* Login/logout
-* JWT-based authentication
-* Access-token authentication
-* Refresh-token rotation
-* Refresh-token family tracking
-* Refresh-token reuse detection
-* Token revocation during logout
-* Password hashing with bcrypt
-* Current-user/session endpoint
-
-### Role-Based Access Control
-
-The application supports:
-
-* Employee
-* Technician
-* Center Manager
-* Administrator
-
-Authorization is enforced on the backend using protected routes and role middleware.
-
-Frontend role restrictions are used for user experience and navigation, while the backend remains the actual security boundary.
-
-### Ticket Management
-
-Tickets support:
-
-* Ticket creation
-* Ticket categorization
-* Priority management
-* Request type management
-* Center association
-* Lab association
-* Software association
-* Technician assignment
-* Status transitions
-* Ticket comments
-* Ticket history
-* Resolution tracking
-* Cancellation
-* SLA tracking
-
-### Service Catalog
-
-Administrators can manage:
-
-* Software
-* Categories
-
-This allows ticket requests to reference a controlled service/software catalog.
-
-### Center and Lab Management
-
-The system supports:
-
-* Multiple service centers
-* Labs belonging to centers
-* User-to-center access
-* Primary user center
-* Authorized center access for management users
-
-### Notifications
-
-The system supports application-level notifications for important ticket and operational events.
-
-### Audit Logs
-
-Important system actions are recorded through audit logging to provide traceability for administrative and security-sensitive operations.
-
-### SLA Monitoring
-
-The SLA module provides:
-
-* SLA policy management
-* SLA policy activation/deactivation
-* Ticket SLA monitoring
-* SLA status information
-* SLA breach visibility
-* First-response tracking
-* Resolution tracking
-
-### Analytics Dashboard
-
-The Analytics dashboard provides operational insights including:
-
-* Total ticket volume
-* Ticket volume by status
-* Ticket trends
-* Tickets by center
-* Tickets by category
-* Tickets by priority
-* SLA compliance
-* Average first response time
-* Average resolution time
-* Resolution rate
-* Technician workload
-
-Analytics can be filtered by:
-
-* Date range
-* Center
-* Category
-* Priority
-* Trend granularity
+The system also supports controlled cancellation and reopening workflows.
 
 ---
 
-## User Roles
+# ✨ Features
 
-### Employee
+## 👤 Role-Based Access Control
 
-Employees can:
+The platform supports four roles:
 
-* Register
-* Log in
-* Create service tickets
-* View their tickets
-* Participate in ticket conversations
-* Provide responses when required
-* Track ticket progress
-* View requester-visible ticket history
+| Role | Responsibilities |
+|---|---|
+| **Employee** | Create tickets, view own tickets, respond to information requests, confirm closure |
+| **Technician** | Manage assigned tickets, communicate with requesters, request information, resolve tickets |
+| **Center Manager** | Manage center tickets, assign technicians, communicate with service teams, manage cancellation workflows |
+| **Admin** | Global ticket management, assignments, administration, SLA monitoring, and analytics |
 
-### Technician
-
-Technicians can:
-
-* Access assigned service work
-* Manage assigned tickets
-* Update ticket status
-* Communicate with requesters
-* Resolve service requests
-
-### Center Manager
-
-Center Managers can manage and monitor resources within their authorized centers.
-
-Capabilities include:
-
-* Ticket management
-* User management
-* Lab management
-* SLA monitoring
-* Analytics
-* Center-scoped operational visibility
-
-Center Manager analytics and management operations are restricted to authorized centers.
-
-### Administrator
-
-Administrators have system-wide administrative access.
-
-Capabilities include:
-
-* User management
-* Center management
-* Lab management
-* Software management
-* Category management
-* Ticket management
-* SLA policy management
-* SLA monitoring
-* Analytics
-* Audit log access
-* System-wide operational visibility
+Authorization is enforced on the backend through role and resource-level policies.
 
 ---
 
-## Ticket Lifecycle
+## 🎫 Ticket Management
 
-Tickets support the following lifecycle states:
+Employees can create IT service requests containing:
+
+- Request type
+- Software
+- Category
+- Center
+- Lab
+- Priority
+- Description
+- Business justification
+- Additional request information
+
+Supported request types:
+
+- Installation
+- Update
+- Uninstallation
+- License
+
+---
+
+## 🔄 Ticket Lifecycle
+
+Supported ticket states:
 
 ```text
 OPEN
-  ↓
 TRIAGED
-  ↓
 ASSIGNED
-  ↓
 IN_PROGRESS
-  ↓
 WAITING_FOR_USER
-  ↓
 RESOLVED
-  ↓
 CLOSED
-```
-
-Additional terminal/cancellation state:
-
-```text
 CANCELLED
 ```
 
-The system maintains ticket history and assignment history so lifecycle changes remain traceable.
+The backend validates lifecycle transitions and prevents unauthorized or invalid state changes.
+
+Supported workflows include:
+
+- Ticket creation
+- Ticket triage
+- Technician assignment
+- Starting work
+- Requesting additional information
+- Employee response
+- Resolution
+- Employee closure confirmation
+- Reopening
+- Cancellation
+- Cancellation requests
 
 ---
 
-## Technology Stack
+# 💬 Ticket Communication
 
-### Frontend
+The system provides a dedicated conversation system for ticket collaboration.
 
-* React 19
-* TypeScript
-* Vite
-* React Router
-* TanStack Query
-* Redux Toolkit
-* Axios
-* React Hook Form
-* Zod
-* Socket.IO
-* Recharts
-* Tailwind CSS v3
-* Lucide React
-* Sonner
+### Public comments
 
-### Backend
+Public comments can be viewed by authorized participants in the ticket conversation.
 
-* Node.js
-* Express 5
-* TypeScript
-* Prisma ORM
-* MySQL
-* JWT
-* bcrypt
-* Pino HTTP
-* Helmet
-* CORS
-* Cookie Parser
+They are used for communication between employees and the service desk.
 
-### Database
+### Internal notes
+
+Internal notes are restricted to authorized staff:
+
+- Technician
+- Center Manager
+- Admin
+
+Employees cannot retrieve internal comments through the backend API.
+
+The backend applies visibility filtering before returning ticket comments.
+
+---
+
+# 📝 Request Information Workflow
+
+When a technician requires additional information, the **Request Information** workflow allows the technician to provide a specific explanation to the requester.
+
+The operation atomically:
+
+1. Creates a public comment.
+2. Changes the ticket to `WAITING_FOR_USER`.
+3. Pauses the active SLA cycle.
+4. Creates ticket history.
+5. Creates an audit record.
+6. Creates a notification for the requester.
+
+This ensures that the comment and ticket state cannot become inconsistent.
 
 ```text
-MySQL
-    │
-    └── Prisma ORM
+Technician
+     │
+     │ Request Information
+     ▼
+Public Comment
+     │
+     ├── Ticket → WAITING_FOR_USER
+     ├── SLA → Paused
+     ├── History → Recorded
+     ├── Audit → Recorded
+     └── Notification → Requester
 ```
 
 ---
 
-## System Architecture
+# ⏱️ SLA Management
 
-The application follows a modular full-stack architecture.
+The system supports SLA-driven ticket processing.
+
+SLA capabilities include:
+
+- First response targets
+- Resolution targets
+- At-risk thresholds
+- SLA cycles
+- SLA pause/resume
+- First response tracking
+- Resolution tracking
+- SLA compliance monitoring
+- SLA alerts
+
+A background scheduler periodically evaluates active tickets for SLA conditions.
+
+The scheduler prevents overlapping scans so that a slow scan does not result in concurrent duplicate processing.
+
+---
+
+# 🔔 Notifications
+
+Notifications are generated for important ticket events such as:
+
+- Ticket creation
+- Assignment
+- Status changes
+- Additional information requests
+- Comments
+- Resolution
+- Cancellation
+- SLA alerts
+
+Notifications are persisted and relevant events can also be delivered through the realtime communication layer.
+
+---
+
+# ⚡ Realtime Updates
+
+The application uses Socket.IO for realtime ticket and notification updates.
+
+Example events include:
 
 ```text
-                    ┌─────────────────────┐
-                    │      Browser        │
-                    │   React Frontend    │
-                    └──────────┬──────────┘
-                               │
-                               │ HTTPS / REST
-                               ▼
-                    ┌─────────────────────┐
-                    │     Express API     │
-                    │     Node.js         │
-                    └──────────┬──────────┘
-                               │
-             ┌─────────────────┼─────────────────┐
-             │                 │                 │
-             ▼                 ▼                 ▼
-        Authentication      Business         Validation
-        Authorization       Modules          & Errors
-             │                 │                 │
-             └─────────────────┼─────────────────┘
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │       Prisma        │
-                    │         ORM         │
-                    └──────────┬──────────┘
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │        MySQL        │
-                    └─────────────────────┘
+ticket:status_changed
+ticket:comment_created
+notification:created
+```
+
+REST APIs remain responsible for persisted application state, while realtime events provide immediate UI updates.
+
+---
+
+# 📊 Administrative Analytics
+
+The administrative analytics system provides operational visibility into:
+
+- Ticket volume
+- Ticket trends
+- Tickets by center
+- Tickets by category
+- Tickets by priority
+- SLA compliance
+- Average resolution time
+- First response time
+- Technician workload
+- Resolution rate
+
+The analytics layer is intended to support service desk monitoring and operational decision-making.
+
+---
+
+# 🔐 Security
+
+Security and authorization considerations include:
+
+- JWT-based authentication
+- bcrypt password hashing
+- Role-based authorization
+- Resource-level authorization
+- Backend lifecycle policies
+- Zod request validation
+- Public/internal comment isolation
+- Audit logging
+- Idempotent ticket creation
+- Protected administrative operations
+- Express security hardening
+
+The frontend is treated as a user interface layer, while the backend remains the final authorization boundary.
+
+---
+
+# 🧱 Architecture
+
+The backend follows a modular domain-oriented architecture.
+
+```text
+backend/
+└── src/
+    ├── common/
+    ├── config/
+    ├── generated/
+    ├── middleware/
+    ├── modules/
+    │   ├── auth/
+    │   ├── users/
+    │   ├── centers/
+    │   ├── labs/
+    │   ├── catalog/
+    │   ├── tickets/
+    │   ├── comments/
+    │   ├── notifications/
+    │   ├── audit/
+    │   └── ...
+    ├── socket/
+    ├── app.ts
+    └── server.ts
+```
+
+The application separates:
+
+- Controllers
+- Use cases
+- Policies
+- Validation schemas
+- Services
+- Database access
+- Notification handling
+- Realtime communication
+
+This keeps business rules out of route handlers and makes the system easier to maintain.
+
+---
+
+# 🗄️ Database
+
+The application uses **MySQL/MariaDB with Prisma ORM**.
+
+Major domain entities include:
+
+- User
+- Center
+- UserCenter
+- Lab
+- Category
+- Software
+- Ticket
+- Comment
+- TicketHistory
+- AssignmentHistory
+- Notification
+- AuditLog
+- TicketNumberCounter
+- TicketSlaCycle
+- NotificationPreference
+- Holiday
+- IdempotencyRecord
+
+The database design supports ticket lifecycle history, SLA tracking, auditability, assignment workflows, notifications, and operational consistency.
+
+---
+
+# 🔒 Transaction & Consistency Design
+
+Critical ticket operations use database transactions.
+
+Ticket creation coordinates:
+
+```text
+Idempotency Reservation
+        ↓
+Ticket Number Allocation
+        ↓
+Ticket Creation
+        ↓
+Ticket History
+        ↓
+SLA Cycle
+        ↓
+Audit Log
+        ↓
+Idempotency Response
+```
+
+If a critical operation fails, the transaction rolls back rather than leaving partially-created ticket state.
+
+Ticket numbers are allocated atomically through the ticket number counter to prevent duplicate ticket numbers during concurrent requests.
+
+---
+
+# ♻️ Idempotency
+
+Ticket creation supports idempotency to protect against duplicate submissions caused by:
+
+- Network retries
+- Browser retries
+- Duplicate client submissions
+- Request replay
+- Client-side timeouts
+
+A repeated request with the same idempotency key can safely return the existing operation result instead of creating another ticket.
+
+---
+
+# 🧪 Validation & Error Handling
+
+The API uses Zod schemas for request validation.
+
+The backend also uses centralized error handling for:
+
+- Validation errors
+- Authentication failures
+- Authorization failures
+- Missing resources
+- Business-rule conflicts
+- Database errors
+
+Common API error categories include:
+
+```text
+400 VALIDATION_ERROR
+401 UNAUTHENTICATED
+403 FORBIDDEN
+404 NOT_FOUND
+409 CONFLICT
 ```
 
 ---
 
-## Project Structure
+# 🖥️ Application Screenshots
+
+The following screenshots demonstrate the main application workflows and role-based experiences.
+
+---
+
+## 🔐 Authentication
+
+### Login
+
+![Login](docs/screenshots/login.png)
+
+### Registration
+
+![Registration](docs/screenshots/register.png)
+
+---
+
+# 👤 Employee Experience
+
+## Employee Dashboard
+
+![Employee Dashboard](docs/screenshots/employee_dashboard.png)
+
+The employee dashboard provides an overview of submitted service requests and their current state.
+
+---
+
+## Ticket Creation
+
+![Ticket Creation](docs/screenshots/ticket_creation.png)
+
+Employees can create service requests by specifying the required software/service information, request type, priority, center, lab, and description.
+
+---
+
+## Ticket Details
+
+![Ticket Details](docs/screenshots/ticket_details.png)
+
+The ticket details view provides the employee with ticket information, lifecycle state, assignment information, SLA information, history, and available actions.
+
+---
+
+## Ticket Conversation
+
+![Ticket Comments](docs/screenshots/ticket_comments.png)
+
+The conversation interface allows authorized participants to communicate about a ticket.
+
+Public communication is visible to the requester and authorized service personnel.
+
+---
+
+# 🧑‍💻 Technician Experience
+
+## Technician Dashboard
+
+![Technician Dashboard](docs/screenshots/technician_dashboard.png)
+
+The technician dashboard provides visibility into assigned work, ticket priorities, statuses, and operational actions.
+
+---
+
+## Request Information
+
+![Request Information](docs/screenshots/request-information.png)
+
+Technicians can request additional information from employees while providing a clear explanation of what information is required.
+
+The request simultaneously updates the ticket lifecycle and SLA state.
+
+---
+
+# 🏢 Center Manager Experience
+
+## Center Manager Dashboard
+
+![Center Manager Dashboard](docs/screenshots/manager_dashboard.png)
+
+The center manager dashboard provides center-scoped ticket management and operational visibility.
+
+Managers can work with tickets within their authorized centers and participate in service desk communication.
+
+---
+
+# 👑 Administration
+
+## Admin Dashboard
+
+![Admin Dashboard](docs/screenshots/admin_dashboard.png)
+
+The admin dashboard provides global visibility and management capabilities across the service desk.
+
+---
+
+## SLA Monitoring
+
+![Admin SLA Monitoring](docs/screenshots/admin_sla_monitoring.png)
+
+The SLA monitoring interface provides visibility into tickets approaching or exceeding configured SLA thresholds.
+
+---
+
+## Analytics
+
+![Admin Analytics](docs/screenshots/admin_analytics.png)
+
+The analytics dashboard provides service desk metrics including ticket distribution, trends, SLA performance, and operational workload.
+
+---
+
+## Additional Analytics View
+
+![Analytics](docs/screenshots/analytics_3.png)
+
+Additional analytical visualization for operational ticket data.
+
+---
+
+# 🛠️ Technology Stack
+
+## Frontend
+
+- React
+- TypeScript
+- Vite
+- React Router
+- TanStack Query
+- React Hook Form
+- Zod
+- Tailwind CSS
+- Lucide React
+- Socket.IO Client
+
+## Backend
+
+- Node.js
+- Express
+- TypeScript
+- Prisma ORM
+- MySQL/MariaDB
+- Zod
+- JWT
+- bcrypt
+- Socket.IO
+
+## Infrastructure
+
+- Git
+- GitHub
+- Render
+- Clever Cloud MySQL/MariaDB
+
+---
+
+# 📁 Repository Structure
 
 ```text
 gradious-service-ticket-system/
 │
 ├── backend/
 │   ├── prisma/
-│   │   ├── schema.prisma
-│   │   └── ...
-│   │
 │   ├── src/
-│   │   ├── common/
-│   │   ├── config/
-│   │   ├── generated/
-│   │   ├── middleware/
-│   │   ├── modules/
-│   │   │   ├── auth/
-│   │   │   ├── tickets/
-│   │   │   ├── notifications/
-│   │   │   ├── catalog/
-│   │   │   ├── users/
-│   │   │   ├── centers/
-│   │   │   ├── labs/
-│   │   │   ├── sla/
-│   │   │   ├── audit/
-│   │   │   └── analytics/
-│   │   │
-│   │   ├── routes/
-│   │   ├── app.ts
-│   │   └── server.ts
-│   │
 │   ├── package.json
+│   ├── tsconfig.json
 │   └── ...
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── components/
-│   │   ├── features/
-│   │   │   ├── auth/
-│   │   │   ├── administration/
-│   │   │   ├── tickets/
-│   │   │   ├── notifications/
-│   │   │   └── ...
-│   │   │
-│   │   ├── lib/
-│   │   ├── routes/
-│   │   └── ...
-│   │
+│   ├── public/
 │   ├── package.json
 │   └── ...
+│
+├── docs/
+│   └── screenshots/
+│       ├── admin_analytics.png
+│       ├── admin_dashboard.png
+│       ├── admin_sla_monitoring.png
+│       ├── analytics_3.png
+│       ├── employee_dashboard.png
+│       ├── login.png
+│       ├── manager_dashboard.png
+│       ├── register.png
+│       ├── request-information.png
+│       ├── technician_dashboard.png
+│       ├── ticket_comments.png
+│       ├── ticket_creation.png
+│       └── ticket_details.png
 │
 └── README.md
 ```
 
 ---
 
-## Backend Modules
+# 🚀 Local Development
 
-### Authentication
-
-Responsible for:
-
-* Registration
-* Login
-* Logout
-* Access tokens
-* Refresh tokens
-* Session management
-* Current-user information
-
-### Tickets
-
-Responsible for:
-
-* Ticket creation
-* Ticket retrieval
-* Ticket updates
-* Assignment
-* Status transitions
-* Comments
-* Ticket history
-* Resolution
-* Cancellation
-
-### Users
-
-Responsible for:
-
-* User management
-* Role management
-* Active/inactive status
-* Center access
-
-### Centers
-
-Responsible for:
-
-* Center creation
-* Center updates
-* Center activation/deactivation
-* Center access management
-
-### Labs
-
-Responsible for:
-
-* Lab management
-* Center-to-lab relationships
-
-### Catalog
-
-Responsible for:
-
-* Software
-* Categories
-* Service catalog relationships
-
-### SLA
-
-Responsible for:
-
-* SLA policies
-* SLA monitoring
-* SLA status
-* Response/resolution tracking
-
-### Notifications
-
-Responsible for application notifications related to service events.
-
-### Audit
-
-Responsible for tracking security-sensitive and administrative actions.
-
-### Analytics
-
-Responsible for aggregating operational metrics from ticket and SLA data.
-
----
-
-## Frontend Architecture
-
-The frontend follows a feature-oriented architecture.
-
-Example:
-
-```text
-features/
-└── administration/
-    └── analytics/
-        ├── api/
-        ├── components/
-        ├── hooks/
-        ├── pages/
-        └── types/
-```
-
-The Analytics module uses:
-
-* API service layer
-* TanStack Query
-* Query keys
-* Dedicated domain types
-* Reusable visualization components
-* Filter state management
-
-This keeps API communication, server state, UI components, and page composition separated.
-
----
-
-## Authentication and Authorization
-
-Authentication is implemented using JWT-based access tokens and refresh-token rotation.
-
-The backend validates the authenticated user before allowing access to protected resources.
-
-Role-based middleware prevents unauthorized access.
-
-Example roles:
-
-```text
-EMPLOYEE
-TECHNICIAN
-CENTER_MANAGER
-ADMIN
-```
-
-Management endpoints are protected according to role.
-
-For example:
-
-```text
-CENTER_MANAGER → authorized center scope
-ADMIN          → system-wide scope
-```
-
-The frontend hides unavailable functionality for better UX, but backend authorization remains authoritative.
-
----
-
-## Ticket and Comment Visibility
-
-Ticket communication supports different visibility levels.
-
-### Public Comments
-
-Public comments can be viewed by:
-
-* Requester
-* Authorized staff
-
-### Internal Comments
-
-Internal comments are restricted to staff.
-
-Internal comments must never be exposed through employee-facing ticket/history responses.
-
-This separation prevents internal operational information from leaking to requesters.
-
----
-
-## SLA Management
-
-The SLA system tracks operational service performance.
-
-SLA monitoring includes:
-
-* SLA cycles
-* Met SLAs
-* Breached SLAs
-* Compliance percentage
-* First response timestamps
-* Resolution timestamps
-
-The analytics dashboard uses SLA outcomes to calculate operational compliance.
-
-Cancelled tickets are excluded from completed SLA-cycle calculations.
-
----
-
-## Analytics
-
-The Analytics module exposes the following endpoints:
-
-```text
-GET /api/v1/analytics/overview
-
-GET /api/v1/analytics/ticket-volume
-
-GET /api/v1/analytics/ticket-trends
-
-GET /api/v1/analytics/by-center
-
-GET /api/v1/analytics/by-category
-
-GET /api/v1/analytics/by-priority
-
-GET /api/v1/analytics/sla-compliance
-
-GET /api/v1/analytics/response-time
-
-GET /api/v1/analytics/resolution-time
-
-GET /api/v1/analytics/technician-workload
-
-GET /api/v1/analytics/resolution-rate
-```
-
-Supported filters include:
-
-```text
-from
-to
-centerId
-categoryId
-priority
-granularity
-```
-
-Trend granularity:
-
-```text
-day
-week
-month
-```
-
-Analytics are scoped according to the authenticated user's role.
-
----
-
-## API Overview
-
-Base URL during local development:
-
-```text
-http://localhost:5000/api/v1
-```
-
-### Health
-
-```http
-GET /health
-```
-
-### Authentication
-
-```http
-POST /auth/register
-POST /auth/login
-POST /auth/refresh
-POST /auth/logout
-GET  /auth/me
-```
-
-### Tickets
-
-```http
-GET    /tickets
-POST   /tickets
-GET    /tickets/:id
-PATCH  /tickets/:id
-POST   /tickets/:id/comments
-POST   /tickets/:id/assign
-```
-
-### Administration
-
-```http
-GET    /users
-GET    /centers
-POST   /centers
-PATCH  /centers/:id
-GET    /labs
-GET    /categories
-GET    /software
-```
-
-### SLA
-
-```http
-GET /sla/monitoring
-GET /sla/policies
-POST /sla/policies
-PATCH /sla/policies/:id
-```
-
-### Analytics
-
-```http
-GET /analytics/overview
-GET /analytics/ticket-volume
-GET /analytics/ticket-trends
-GET /analytics/by-center
-GET /analytics/by-category
-GET /analytics/by-priority
-GET /analytics/sla-compliance
-GET /analytics/response-time
-GET /analytics/resolution-time
-GET /analytics/technician-workload
-GET /analytics/resolution-rate
-```
-
----
-
-## Database
-
-The application uses **MySQL** with Prisma ORM.
-
-Major entities include:
-
-```text
-User
-Center
-UserCenter
-Lab
-Category
-Software
-Ticket
-Comment
-TicketHistory
-AssignmentHistory
-Notification
-AuditLog
-```
-
-Tickets maintain relationships with:
-
-* Requester
-* Assignee
-* Center
-* Lab
-* Category
-* Software
-
-The database also maintains historical records for ticket lifecycle and assignment changes.
-
----
-
-## Environment Variables
-
-### Backend
-
-Create:
-
-```text
-backend/.env
-```
-
-Example:
-
-```env
-NODE_ENV=development
-
-PORT=5000
-
-DATABASE_URL="mysql://USERNAME:PASSWORD@localhost:3306/gradious_ticket_system"
-
-FRONTEND_URL="http://localhost:5173"
-
-JWT_ACCESS_SECRET="your-access-token-secret"
-
-JWT_REFRESH_SECRET="your-refresh-token-secret"
-```
-
-Use strong, unique secrets in production.
-
-Never commit `.env` files to Git.
-
----
-
-### Frontend
-
-Create:
-
-```text
-frontend/.env
-```
-
-Example:
-
-```env
-VITE_API_BASE_URL=http://localhost:5000/api/v1
-```
-
-Production deployments should use the deployed backend API URL.
-
----
-
-## Local Development
-
-### Prerequisites
+## Prerequisites
 
 Install:
 
-* Node.js 22+
-* MySQL
-* npm
-* Git
+- Node.js 22+
+- npm
+- MySQL/MariaDB
+- Git
 
 ---
 
-### 1. Clone the repository
-
-```bash
-git clone <repository-url>
-```
-
-```bash
-cd gradious-service-ticket-system
-```
-
----
-
-### 2. Backend setup
+## Backend
 
 ```bash
 cd backend
-```
-
-Install dependencies:
-
-```bash
 npm install
 ```
 
-Configure:
+Configure the required environment variables in:
 
 ```text
 .env
 ```
 
-Run Prisma generation:
+Generate the Prisma client:
 
 ```bash
 npx prisma generate
 ```
-
-Validate the schema:
-
-```bash
-npx prisma validate
-```
-
-Apply the database schema/migrations as configured for the environment.
 
 Start the backend:
 
@@ -852,7 +653,7 @@ Start the backend:
 npm run dev
 ```
 
-The API should be available at:
+The backend runs on:
 
 ```text
 http://localhost:5000
@@ -861,135 +662,225 @@ http://localhost:5000
 Health endpoint:
 
 ```text
-http://localhost:5000/api/v1/health
+GET /api/v1/health
 ```
 
 ---
 
-### 3. Frontend setup
-
-Open another terminal:
+## Frontend
 
 ```bash
 cd frontend
-```
-
-Install dependencies:
-
-```bash
 npm install
-```
-
-Configure:
-
-```text
-.env
-```
-
-Start the development server:
-
-```bash
 npm run dev
 ```
 
-The frontend will normally be available at:
+The Vite development server will provide the local frontend URL.
+
+---
+
+# 🌐 Production Deployment
+
+The application is designed to run as a separate frontend/backend deployment with a managed MySQL/MariaDB database.
 
 ```text
-http://localhost:5173
+┌──────────────────┐
+│     Frontend     │
+│      React       │
+└────────┬─────────┘
+         │
+         │ REST / Socket.IO
+         ▼
+┌──────────────────┐
+│      Backend     │
+│ Node + Express   │
+└────────┬─────────┘
+         │
+         │ Prisma
+         ▼
+┌──────────────────┐
+│  MySQL/MariaDB   │
+└──────────────────┘
 ```
+
+### Production URLs
+
+Frontend:
+
+`[ ADD PRODUCTION FRONTEND URL HERE ]`
+
+Backend:
+
+`[ ADD PRODUCTION BACKEND URL HERE ]`
+
+API Health Check:
+
+`[ ADD PRODUCTION HEALTH URL HERE ]`
 
 ---
 
-## Production Build
+# 🔑 Environment Variables
 
-### Backend
+Sensitive configuration is not committed to the repository.
 
-```bash
-cd backend
-npm install
-npm run build
-npm start
-```
-
-Before deployment, ensure:
-
-* Production database is configured
-* Environment variables are configured
-* Prisma client is generated
-* Database schema is applied
-* Frontend URL is configured correctly
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run build
-```
-
-The generated production assets will be placed in:
+The backend requires environment-specific configuration such as:
 
 ```text
-frontend/dist
+DATABASE_URL
+JWT_SECRET
+JWT_EXPIRES_IN
+CORS_ORIGIN
+PORT
 ```
 
----
-
-## Security
-
-The application includes several security measures.
-
-### HTTP Security
-
-* Helmet
-* CORS configuration
-* Disabled `X-Powered-By`
-* JSON request-size limits
-
-### Authentication Security
-
-* bcrypt password hashing
-* JWT authentication
-* Refresh-token rotation
-* Refresh-token reuse detection
-* Token revocation
-* Secure logout handling
-
-### Authorization
-
-* Backend role middleware
-* Center-scoped authorization
-* Protected management routes
-* Resource-level access checks
-
-### Auditability
-
-Security-sensitive and administrative actions can be recorded through audit logs.
-
-### Data Exposure Prevention
-
-Internal ticket comments are separated from requester-visible comments to prevent accidental information disclosure.
+Production secrets should be configured through the deployment platform rather than committed to Git.
 
 ---
 
-## Engineering Practices
+# 📐 Engineering Decisions
 
-The project follows several production-oriented engineering principles.
+## Backend Authorization
 
-### Backend
+Frontend permission checks are used to control the user experience, but backend authorization remains authoritative.
 
-* Modular architecture
-* Service/controller separation
-* Request validation
-* Centralized error handling
-* Transactional database operations
-* Role-based authorization
-* Query scoping
-* Audit logging
-* Structured logging
-* API versioning
+This prevents users from bypassing security simply by modifying frontend requests.
 
-### Frontend
+---
 
-* Feature-oriented architecture
-* Ta
+## Atomic Lifecycle Operations
+
+Important lifecycle operations coordinate related database changes inside transactions.
+
+For example, requesting information updates:
+
+```text
+Comment
+Ticket Status
+SLA Cycle
+Ticket History
+Audit Log
+Notification
+```
+
+as one logical operation.
+
+---
+
+## Public vs Internal Communication
+
+Public communication is intended for requester/service-desk collaboration.
+
+Internal notes are restricted to authorized staff and are filtered at the backend.
+
+---
+
+## SLA Cycles
+
+SLA state is represented separately from ticket status so that SLA timers can be paused and resumed during states such as `WAITING_FOR_USER`.
+
+---
+
+## Auditability
+
+Important ticket operations generate audit information and lifecycle history, providing a traceable record of changes.
+
+---
+
+## Realtime Communication
+
+REST APIs remain the source of persisted application state, while Socket.IO provides realtime delivery of important events.
+
+---
+
+## User-Scoped Client Caching
+
+Ticket comment queries are scoped by the authenticated user's identity and role.
+
+This prevents a cached comment response from one account from being reused by another account when users switch sessions in the same browser.
+
+Backend visibility filtering remains the primary security boundary.
+
+---
+
+# ⚙️ Production Considerations
+
+The project includes several production-oriented considerations:
+
+- Role-based authorization
+- Resource-level access control
+- Transactional lifecycle operations
+- Idempotent ticket creation
+- Atomic ticket number generation
+- SLA monitoring
+- Audit logging
+- Centralized error handling
+- Input validation
+- Realtime updates
+- Notification deduplication
+- User-scoped client caching
+- Express proxy configuration
+- Disabled Express `x-powered-by` header
+- Transaction timeout handling for managed database environments
+
+---
+
+# 🧹 Operational Logging
+
+Application logs are retained for operational observability and troubleshooting.
+
+Expected/idempotent database conditions are handled by the application rather than being treated as fatal failures.
+
+Temporary development/debug logging should not be committed to production.
+
+Sensitive credentials, tokens, passwords, and other secrets are never intentionally logged.
+
+---
+
+# 🧭 Project Status
+
+**Status: Completed**
+
+The project includes:
+
+- Authentication
+- Role-based authorization
+- Employee registration
+- Ticket creation
+- Ticket lifecycle management
+- Center management
+- Lab management
+- Software/catalog management
+- Technician assignment
+- Center manager assignment
+- Public comments
+- Internal staff notes
+- Request information workflow
+- SLA tracking
+- SLA monitoring
+- Notifications
+- Realtime updates
+- Audit history
+- Idempotent ticket creation
+- Administrative analytics
+- Production deployment configuration
+- Responsive application UI
+
+---
+
+# 👨‍💻 Author
+
+**Sriniketh Vangipuram**
+
+Full Stack Developer
+
+### Core Technologies
+
+`React` · `TypeScript` · `Node.js` · `Express` · `Prisma` · `MySQL` · `MongoDB` · `REST APIs` · `JWT` · `Socket.IO`
+
+---
+
+# 📜 License
+
+This project was developed as part of the Gradious training/project assignment.
+
+All rights reserved.

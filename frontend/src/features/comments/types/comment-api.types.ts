@@ -31,3 +31,13 @@ export type CreateTicketCommentResponse =
   CommentSuccessResponse<{
     comment: TicketComment;
   }>;
+
+  export interface RequestInformationRequest {
+  comment: string;
+}
+
+export type RequestInformationResponse =
+  CommentSuccessResponse<{
+    ticket: import("../../tickets/types/ticket.types").Ticket;
+    comment: TicketComment;
+  }>;

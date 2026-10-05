@@ -22,13 +22,27 @@ export function TicketComments({
   canRespond,
   isResponseRequired,
 }: TicketCommentsProps) {
-  const commentsQuery = useTicketComments(ticketId);
+  const commentsQuery = useTicketComments(
+  ticketId,
+  currentUser?.id ?? null,
+  currentUser?.role ?? null,
+);
   const createCommentMutation = useCreateTicketComment();
 
   const [commentVisibility, setCommentVisibility] =
     useState<"PUBLIC" | "INTERNAL">("PUBLIC");
 
-  const isTechnician = currentUser?.role === "TECHNICIAN";
+  /*
+   * Employees can send public comments only.
+   *
+   * Technicians, Center Managers, and Admins are
+   * authorized staff and can choose between public
+   * replies and internal notes.
+   */
+  const canUseInternalComments =
+    currentUser?.role === "TECHNICIAN" ||
+    currentUser?.role === "CENTER_MANAGER" ||
+    currentUser?.role === "ADMIN";
 
   const handleSubmit = async (
     values: CreateTicketCommentFormValues,
@@ -38,7 +52,7 @@ export function TicketComments({
         ticketId,
         payload: {
           content: values.content,
-          visibility: isTechnician
+          visibility: canUseInternalComments
             ? commentVisibility
             : "PUBLIC",
         },
@@ -50,7 +64,7 @@ export function TicketComments({
           : "Reply sent",
       );
 
-      if (isTechnician) {
+      if (canUseInternalComments) {
         setCommentVisibility("PUBLIC");
       }
     } catch {
@@ -111,7 +125,7 @@ export function TicketComments({
             </p>
           ) : null}
 
-          {isTechnician ? (
+          {canUseInternalComments ? (
             <div className="mb-3 flex w-fit rounded-lg border border-slate-800 bg-slate-900 p-1">
               <button
                 type="button"
@@ -144,7 +158,7 @@ export function TicketComments({
           <CommentComposer
             onSubmit={handleSubmit}
             visibility={
-              isTechnician
+              canUseInternalComments
                 ? commentVisibility
                 : "PUBLIC"
             }

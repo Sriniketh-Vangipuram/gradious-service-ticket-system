@@ -122,3 +122,29 @@ export function canRespondToTicket(
     ticket.status !== "CANCELLED"
   );
 }
+
+export function canCommentOnTicket(
+  user: AuthUser,
+  ticket: Ticket,
+): boolean {
+  if (
+    ticket.status === "CLOSED" ||
+    ticket.status === "CANCELLED"
+  ) {
+    return false;
+  }
+
+  if (user.role === "ADMIN") {
+    return true;
+  }
+
+  if (user.role === "CENTER_MANAGER") {
+    return user.centerId === ticket.centerId;
+  }
+
+  if (user.role === "TECHNICIAN") {
+    return ticket.assigneeId === user.id;
+  }
+
+  return ticket.requesterId === user.id;
+}

@@ -4,6 +4,8 @@ import type {
   CreateTicketCommentRequest,
   CreateTicketCommentResponse,
   ListTicketCommentsResponse,
+  RequestInformationRequest,
+  RequestInformationResponse,
 } from "../types/comment-api.types";
 
 /* -------------------------------------------------------------------------- */
@@ -32,6 +34,19 @@ export async function createTicketComment(
     `/tickets/${ticketId}/comments`,
     payload,
   );
+
+  return response.data;
+}
+
+export async function requestTicketInformation(
+  ticketId: number,
+  payload: RequestInformationRequest,
+): Promise<RequestInformationResponse> {
+  const response =
+    await httpClient.post<RequestInformationResponse>(
+      `/tickets/${ticketId}/request-information`,
+      payload,
+    );
 
   return response.data;
 }

@@ -18,6 +18,7 @@ import {
   requestCancellationBodySchema,
   reviewCancellationRequestBodySchema,
   cancellationRequestReviewParamsSchema,
+  requestInformationBodySchema,
 
 } from "./ticket.schemas";
 
@@ -38,6 +39,7 @@ import {
   approveCancellationRequestController,
   rejectCancellationRequestController,
   requestCancellationController,
+  requestInformationController,
   
 } from "./ticket.controller";
 
@@ -150,6 +152,16 @@ ticketRouter.post(
     body: reviewCancellationRequestBodySchema,
   }),
   rejectCancellationRequestController,
+);
+
+ticketRouter.post(
+  "/:ticketId/request-information",
+  requireAuth,
+  validateRequest({
+    params: ticketIdParamsSchema,
+    body: requestInformationBodySchema,
+  }),
+  requestInformationController,
 );
 
 ticketRouter.patch(
