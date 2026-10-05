@@ -30,7 +30,9 @@ function isPrismaUniqueConstraintError(
   error: unknown,
 ): error is Prisma.PrismaClientKnownRequestError {
   return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
     error.code === "P2002"
   );
 }

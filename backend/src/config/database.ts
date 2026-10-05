@@ -15,5 +15,27 @@ const adapter = new PrismaMariaDb({
 });
 
 export const prisma = new PrismaClient({
-  adapter
+  adapter,
+  log: [
+    {
+      emit: "event",
+      level: "query",
+    },
+    {
+      emit: "event",
+      level: "error",
+    },
+  ],
+});
+
+prisma.$on("query", (event) => {
+  console.log("[Prisma Query]", {
+    query: event.query,
+    params: event.params,
+    duration: event.duration,
+  });
+});
+
+prisma.$on("error", (event) => {
+  console.error("[Prisma Error]", event);
 });
