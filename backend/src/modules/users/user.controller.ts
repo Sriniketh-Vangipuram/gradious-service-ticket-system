@@ -12,6 +12,7 @@ import {
   updateUserProfileBodySchema,
   createUserBodySchema,
   updateUserPrimaryCenterBodySchema,
+  updateUserLabBodySchema,
  } from "./user.schemas";
 
 import { 
@@ -24,9 +25,8 @@ import {
   updateUserProfileUseCase,
   createUserUseCase,
   updateUserPrimaryCenterUseCase,
+  updateUserLabUseCase,
  } from "./user.use-case";
-
-
 
 export async function createUserController(
   req: Request,
@@ -424,6 +424,53 @@ export async function updateUserPrimaryCenterController(
   const result = await updateUserPrimaryCenterUseCase(
     params.userId,
     body.centerId,
+    {
+      userId: authUser.userId,
+      role: authUser.role,
+    },
+  );
+
+  res.status(200).json({
+    success: true,
+    data: result,
+  });
+}
+export async function updateUserLabController(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const authUser = req.authUser;
+
+  if (!authUser) {
+    res.status(401).json({
+      error: {
+        code: "UNAUTHENTICATED",
+        message: "Authentication is required.",
+      },
+    });
+
+    return;
+  }
+
+  const params = getValidatedData(
+    req,
+    {
+      params: userIdParamsSchema,
+    },
+    "params",
+  );
+
+  const body = getValidatedData(
+    req,
+    {
+      body: updateUserLabBodySchema,
+    },
+    "body",
+  );
+
+  const result = await updateUserLabUseCase(
+    params.userId,
+    body.labId,
     {
       userId: authUser.userId,
       role: authUser.role,

@@ -194,3 +194,17 @@ export type UpdateUserPrimaryCenterBody =
   z.infer<
     typeof updateUserPrimaryCenterBodySchema
   >;
+
+  export const updateUserLabBodySchema = z
+  .object({
+    labId: z
+      .coerce
+      .number()
+      .int("Lab ID must be an integer.")
+      .positive("Lab ID must be greater than zero."),
+  })
+  .strict();
+
+export type UpdateUserLabBody = z.infer<
+  typeof updateUserLabBodySchema
+>;

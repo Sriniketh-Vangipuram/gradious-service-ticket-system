@@ -170,3 +170,26 @@ export async function updateUserPrimaryCenter(
 
   return response.data.data;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Update user lab                                                            */
+/* -------------------------------------------------------------------------- */
+
+export interface UpdateUserLabRequest {
+  labId: number;
+}
+
+export async function updateUserLab(
+  userId: number,
+  payload: UpdateUserLabRequest,
+): Promise<AdministrationUser> {
+  const response = await httpClient.patch<{
+    success: boolean;
+    data: AdministrationUser;
+  }>(
+    `/users/${userId}/lab`,
+    payload,
+  );
+
+  return response.data.data;
+}

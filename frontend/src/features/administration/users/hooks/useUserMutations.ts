@@ -6,11 +6,13 @@ import {
   updateUserProfile,
   updateUserSpecializations,
   updateUserStatus,
+  updateUserLab,
   type CreateUserRequest,
   type UpdateUserPrimaryCenterRequest,
   type UpdateUserProfileRequest,
   type UpdateUserSpecializationsRequest,
   type UpdateUserStatusRequest,
+  type UpdateUserLabRequest,
 } from "../api/userService";
 
 import { USER_QUERY_KEYS } from "../api/user.keys";
@@ -138,6 +140,34 @@ export function useUpdateUserSpecializations() {
         {
           specializations,
         },
+      ),
+
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: USER_QUERY_KEYS.lists(),
+      });
+    },
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Update user lab                                                            */
+/* -------------------------------------------------------------------------- */
+
+export function useUpdateUserLab() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      userId,
+      payload,
+    }: {
+      userId: number;
+      payload: UpdateUserLabRequest;
+    }) =>
+      updateUserLab(
+        userId,
+        payload,
       ),
 
     onSuccess: async () => {

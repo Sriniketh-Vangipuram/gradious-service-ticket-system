@@ -15,6 +15,7 @@ import {
   createUserBodySchema,
   updateUserPrimaryCenterBodySchema,
   updateUserRoleBodySchema,
+  updateUserLabBodySchema
 } from "./user.schemas";
 
 import { 
@@ -27,6 +28,7 @@ import {
   createUserController,
   updateUserPrimaryCenterController,
   updateUserRoleController,
+  updateUserLabController,
 } from "./user.controller";
 
 const userRouter = Router();
@@ -75,6 +77,20 @@ userRouter.patch(
     body: updateUserPrimaryCenterBodySchema,
   }),
   updateUserPrimaryCenterController,
+);
+
+userRouter.patch(
+  "/:userId/lab",
+  requireAuth,
+  requireRole(
+    UserRole.CENTER_MANAGER,
+    UserRole.ADMIN,
+  ),
+  validateRequest({
+    params: userIdParamsSchema,
+    body: updateUserLabBodySchema,
+  }),
+  updateUserLabController,
 );
 
 userRouter.get(

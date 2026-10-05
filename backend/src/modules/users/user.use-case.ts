@@ -1056,6 +1056,239 @@ export async function updateUserPrimaryCenterUseCase(
   return updatedUser;
 }
 
+export async function updateUserLabUseCase(
+  userId: number,
+  labId: number,
+  actor: UserManagementActor,
+) {
+  if (
+    actor.role !== UserRole.ADMIN &&
+    actor.role !== UserRole.CENTER_MANAGER
+  ) {
+    throw new AppError(
+      "FORBIDDEN",
+      "You are not allowed to assign users to labs.",
+    );
+  }
+
+  const targetUser = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      role: true,
+      isActive: true,
+      centerId: true,
+      labId: true,
+
+      centerAccess: {
+        select: {
+          centerId: true,
+        },
+      },
+
+      lab: {
+        select: {
+          id: true,
+          name: true,
+          code: true,
+        },
+      },
+    },
+  });
+
+  if (!targetUser) {
+    throw new AppError(
+      "NOT_FOUND",
+      "User was not found.",
+    );
+  }
+
+  /*
+   * Labs are assigned to employees and technicians.
+   */
+  if (
+    targetUser.role !== UserRole.EMPLOYEE &&
+    targetUser.role !== UserRole.TECHNICIAN
+  ) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Only employees and technicians can be assigned to labs.",
+    );
+  }
+
+  /*
+   * A user must have a primary center before
+   * a lab can be assigned.
+   */
+  if (targetUser.centerId === null) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "The user must have a primary center before a lab can be assigned.",
+    );
+  }
+
+  /*
+   * CENTER_MANAGER authorization.
+   *
+   * The manager must have access to the user's
+   * authorization scope.
+   */
+  if (actor.role === UserRole.CENTER_MANAGER) {
+    const managerAccess = await prisma.userCenter.findFirst({
+      where: {
+        userId: actor.userId,
+        centerId: {
+          in: targetUser.centerAccess.map(
+            (access) => access.centerId,
+          ),
+        },
+      },
+      select: {
+        centerId: true,
+      },
+    });
+
+    if (!managerAccess) {
+      throw new AppError(
+        "FORBIDDEN",
+        "You do not have access to manage this user.",
+      );
+    }
+  }
+
+  /*
+   * The selected lab must:
+   * - exist
+   * - be active
+   * - belong to the user's primary center
+   */
+  const lab = await prisma.lab.findFirst({
+    where: {
+      id: labId,
+      centerId: targetUser.centerId,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      centerId: true,
+    },
+  });
+
+  if (!lab) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "The selected lab does not exist, is inactive, or does not belong to the user's primary center.",
+    );
+  }
+
+  /*
+   * No-op assignment.
+   */
+  if (targetUser.labId === labId) {
+    return {
+      id: targetUser.id,
+      fullName: targetUser.fullName,
+      email: targetUser.email,
+      role: targetUser.role,
+      isActive: targetUser.isActive,
+
+      center: await prisma.center.findUnique({
+        where: {
+          id: targetUser.centerId,
+        },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+        },
+      }),
+
+      lab: {
+        id: lab.id,
+        name: lab.name,
+        code: lab.code,
+      },
+    };
+  }
+
+  const updatedUser = await prisma.$transaction(
+    async (tx) => {
+      const updated = await tx.user.update({
+        where: {
+          id: userId,
+        },
+
+        data: {
+          labId,
+        },
+
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          role: true,
+          isActive: true,
+
+          center: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
+
+          lab: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
+
+          updatedAt: true,
+        },
+      });
+
+      await createAuditLog(
+        {
+          action: "USER_UPDATED",
+
+          entityType: "USER",
+          entityId: String(userId),
+
+          actorId: actor.userId,
+
+          oldValue: {
+            labId: targetUser.labId,
+          },
+
+          newValue: {
+            labId: updated.lab?.id ?? null,
+          },
+
+          metadata: {
+            operation:
+              targetUser.labId === null
+                ? "LAB_ASSIGNED"
+                : "LAB_CHANGED",
+          },
+        },
+        tx,
+      );
+
+      return updated;
+    },
+  );
+
+  return updatedUser;
+}
+
 export async function updateUserProfileUseCase(
   userId: number,
   data: {

@@ -21,6 +21,7 @@ import {
   useUpdateUserProfile,
   useUpdateUserSpecializations,
   useUpdateUserStatus,
+  useUpdateUserLab,
 } from "../hooks/useUserMutations";
 
 import { useUsers } from "../hooks/useUsers";
@@ -86,6 +87,9 @@ export default function AdministrationUsersPage() {
 
   const updatePrimaryCenterMutation =
     useUpdateUserPrimaryCenter();
+
+  const updateLabMutation =
+    useUpdateUserLab();
 
   /* ---------------------------------------------------------------------- */
   /* User status                                                             */
@@ -294,7 +298,8 @@ export default function AdministrationUsersPage() {
         onClose={() => {
           if (
             !updateProfileMutation.isPending &&
-            !updatePrimaryCenterMutation.isPending
+            !updatePrimaryCenterMutation.isPending &&
+            !updateLabMutation.isPending
           ) {
             setSelectedUser(null);
           }
@@ -303,6 +308,7 @@ export default function AdministrationUsersPage() {
           fullName,
           email,
           primaryCenterId,
+          labId,
         }) => {
           if (!selectedUser) {
             return;
@@ -334,6 +340,21 @@ export default function AdministrationUsersPage() {
               );
             }
 
+            if (
+              (
+                selectedUser.role === "EMPLOYEE" ||
+                selectedUser.role === "TECHNICIAN"
+              ) &&
+              labId !== undefined
+            ) {
+              await updateLabMutation.mutateAsync({
+                userId: selectedUser.id,
+                payload: {
+                  labId,
+                },
+              });
+            }
+
             toast.success(
               "User updated successfully.",
             );
@@ -349,7 +370,8 @@ export default function AdministrationUsersPage() {
         }}
         isSaving={
           updateProfileMutation.isPending ||
-          updatePrimaryCenterMutation.isPending
+          updatePrimaryCenterMutation.isPending ||
+          updateLabMutation.isPending
         }
       />
 

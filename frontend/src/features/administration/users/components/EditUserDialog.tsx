@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import type { AdministrationUser } from "../types/user.types";
 import type { UpdateUserProfileRequest } from "../api/userService";
 import { useCenters } from "../../centers/hooks/useCenters";
+import { useLabs } from "../../labs/hooks/useLabs";
 
 interface EditUserDialogProps {
   user: AdministrationUser | null;
@@ -11,6 +12,7 @@ interface EditUserDialogProps {
   onSave: (
     payload: UpdateUserProfileRequest & {
       primaryCenterId: number;
+      labId?: number;
     },
   ) => void;
   isSaving: boolean;
@@ -35,13 +37,46 @@ export function EditUserDialog({
       user?.center?.id,
     );
 
+  const [labId, setLabId] =
+    useState<number | undefined>(
+      user?.lab?.id,
+    );
+
   const centersQuery = useCenters();
 
-  const centers = centersQuery.data?.data?.data ?? [];
+  const centers =
+    centersQuery.data?.data?.data ?? [];
+
+  const labsQuery = useLabs(
+    primaryCenterId !== undefined
+      ? {
+          centerId: primaryCenterId,
+          isActive: true,
+          page: 1,
+          limit: 100,
+        }
+      : undefined,
+  );
+
+  const labs =
+    labsQuery.data?.data?.data ?? [];
 
   if (!user) {
     return null;
   }
+
+  const isLabAssignable =
+    user.role === "EMPLOYEE" ||
+    user.role === "TECHNICIAN";
+
+  const selectedLabBelongsToCenter =
+    labId !== undefined &&
+    labs.some((lab) => lab.id === labId);
+
+  const effectiveLabId =
+    selectedLabBelongsToCenter
+      ? labId
+      : undefined;
 
   function handleSubmit(
     event: React.FormEvent<HTMLFormElement>,
@@ -56,7 +91,27 @@ export function EditUserDialog({
       fullName: fullName.trim(),
       email: email.trim(),
       primaryCenterId,
+      labId: isLabAssignable
+        ? effectiveLabId
+        : undefined,
     });
+  }
+
+  function handleCenterChange(
+    event: React.ChangeEvent<HTMLSelectElement>,
+  ) {
+    const nextCenterId = event.target.value
+      ? Number(event.target.value)
+      : undefined;
+
+    setPrimaryCenterId(nextCenterId);
+
+    /*
+     * A lab belongs to exactly one center.
+     * When the center changes, the previously
+     * selected lab must no longer be submitted.
+     */
+    setLabId(undefined);
   }
 
   return (
@@ -75,7 +130,7 @@ export function EditUserDialog({
             </h2>
 
             <p className="mt-1 text-sm text-slate-400">
-              Update profile and primary center assignment.
+              Update profile, primary center and lab assignment.
             </p>
           </div>
 
@@ -165,34 +220,90 @@ export function EditUserDialog({
             </label>
 
             <select
-                value={primaryCenterId ?? ""}
-                onChange={(event) =>
-                  setPrimaryCenterId(
-                    event.target.value
-                      ? Number(event.target.value)
-                      : undefined,
-                  )
-                }
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500"
-              >
-                <option value="" disabled>
-                  Select primary center
-                </option>
+              id="edit-user-center"
+              value={primaryCenterId ?? ""}
+              onChange={handleCenterChange}
+              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500"
+            >
+              <option value="" disabled>
+                Select primary center
+              </option>
 
-                {centers.map((center) => (
-                  <option
-                    key={center.id}
-                    value={center.id}
-                  >
-                    {center.name} ({center.code})
-                  </option>
-                ))}
-              </select>
+              {centers.map((center) => (
+                <option
+                  key={center.id}
+                  value={center.id}
+                >
+                  {center.name} ({center.code})
+                </option>
+              ))}
+            </select>
+
             <p className="mt-1.5 text-xs text-slate-500">
               Changing the primary center will also authorize
               the user for that center.
             </p>
           </div>
+
+          {/* Lab */}
+          {isLabAssignable && (
+            <div>
+              <label
+                htmlFor="edit-user-lab"
+                className="mb-1.5 block text-sm font-medium text-slate-300"
+              >
+                Assigned lab
+              </label>
+
+              <select
+                id="edit-user-lab"
+                value={effectiveLabId ?? ""}
+                onChange={(event) =>
+                  setLabId(
+                    event.target.value
+                      ? Number(event.target.value)
+                      : undefined,
+                  )
+                }
+                disabled={
+                  primaryCenterId === undefined ||
+                  labsQuery.isLoading ||
+                  labsQuery.isError
+                }
+                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">
+                  {primaryCenterId === undefined
+                    ? "Select a center first"
+                    : labsQuery.isLoading
+                      ? "Loading labs..."
+                      : labsQuery.isError
+                        ? "Unable to load labs"
+                        : "Select lab"}
+                </option>
+
+                {labs.map((lab) => (
+                  <option
+                    key={lab.id}
+                    value={lab.id}
+                  >
+                    {lab.name} ({lab.code})
+                  </option>
+                ))}
+              </select>
+
+              <p className="mt-1.5 text-xs text-slate-500">
+                Only active labs belonging to the selected
+                primary center are available.
+              </p>
+
+              {labsQuery.isError && (
+                <p className="mt-1.5 text-xs text-red-400">
+                  Failed to load labs for this center.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end gap-3 border-t border-slate-800 pt-5">
@@ -211,7 +322,9 @@ export function EditUserDialog({
                 isSaving ||
                 fullName.trim().length < 2 ||
                 email.trim().length === 0 ||
-                primaryCenterId === undefined
+                primaryCenterId === undefined ||
+                (isLabAssignable &&
+                  effectiveLabId === undefined)
               }
               className="rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
