@@ -385,7 +385,8 @@ export async function createTicketUseCase(
    */
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(
+      async (tx) => {
       // --------------------------------------------------------
       // Idempotency reservation
       // --------------------------------------------------------
@@ -564,7 +565,11 @@ export async function createTicketUseCase(
         responseStatus: 201,
         responseBody,
       };
-    });
+    },{
+      maxWait: 5000,
+      timeout: 15000,
+    }
+  );
 
     /*
      * ============================================================
